@@ -6,8 +6,8 @@ import time
 from datetime import datetime
 
 # Configurações MQTT
-# mqtt-dashboard.com
-MQTT_BROKER = "broker.hivemq.com"
+# mqtt-dashboard.com broker.hivemq.com
+MQTT_BROKER = "mqtt-dashboard.com"
 MQTT_PORT = 1883
 MQTT_MOVE_TOPIC = "pisid_mazemov_15"  # Tópico para obter a info do movimento
 MQTT_SOUND_TOPIC = "pisid_mazesound_15"  # Tópico para obter a info do som
@@ -68,10 +68,9 @@ def on_message(client, userdata, msg):
         # Separar os campos e criar um dicionário
         fields = payload.split(", ")
         message = {}
-        for field in fields:
-            key, value = field.split(":", 1) 
-            message[key.strip()] = value.strip()
+        message["Player"] = int(fields[0].split(":")[1])
         message["Hour"] = get_current_timestamp() # Possivel erro ?????
+        message["Sound"] = fields[2].split(":")[1]
         
     # Inserir na fila para processamento no MongoDB
     message_queue.put((msg.topic, message))
