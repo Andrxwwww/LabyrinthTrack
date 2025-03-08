@@ -14,9 +14,10 @@ III. Ir para a script CloudToMongo.py e dar Run
 
 IV. Na cmd correr:
 > game 15
+// ou entao outro broker para o IDJogo nao ficar todo cagado
+> game 15 2 1 broker.hivemq.com 1883
 
 #NOTAS:
-
 - Porquê é que foi usado 3 / 4 threads ? e não 2 ou 5 ?
 Cada thread tem um propósito específico no sistema neste caso estes aqui:
 
