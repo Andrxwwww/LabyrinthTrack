@@ -6,7 +6,8 @@ import time
 from datetime import datetime
 
 # Configurações MQTT
-MQTT_BROKER = "mqtt-dashboard.com"
+# mqtt-dashboard.com
+MQTT_BROKER = "broker.hivemq.com"
 MQTT_PORT = 1883
 MQTT_MOVE_TOPIC = "pisid_mazemov_15"  # Tópico para obter a info do movimento
 MQTT_SOUND_TOPIC = "pisid_mazesound_15"  # Tópico para obter a info do som
@@ -59,8 +60,8 @@ def on_message(client, userdata, msg):
         message = {}
         for field in fields:
             key, value = field.split(":")
-            message[key.strip()] = value.strip()
-        message["Hour"] = get_current_timestamp() # Possivel erro ?????
+            message[key.strip()] = int(value.strip())
+        message["Hora"] = get_current_timestamp() # Possivel erro ?????
         
     elif msg.topic == MQTT_SOUND_TOPIC:
         # Exemplo de payload: "Player:15, Hour:2025-03-07 21:04:29.193352, Sound:19.2"
