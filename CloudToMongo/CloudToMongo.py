@@ -13,7 +13,7 @@ MQTT_MOVE_TOPIC = "pisid_mazemov_15"  # Tópico para obter a info do movimento
 MQTT_SOUND_TOPIC = "pisid_mazesound_15"  # Tópico para obter a info do som
 
 # Configurações MongoDB
-MONGO_URI = "mongodb://localhost:23019/"  # Ajustar conforme necessário
+MONGO_URI = "mongodb://localhost:27017/"  # Ajustar conforme necessário
 MONGO_DB = "PISID_Maze"
 MONGO_COLLECTION_MOVE = "Move"
 MONGO_COLLECTION_SOUND = "Sound"
@@ -82,8 +82,12 @@ def new_game():
         # Contar o número de documentos com Status: 2
         count = collection_move.count_documents({"Status": 2})
 
+        # Obtém o num de marsamis de forma diferenciada
+        num_marsami = len(collection_move.distinct("Marsami"))
+        print(f"O NUMERO DE MARSAMIS É: {num_marsami}")
+
         # Verificar se o número de documentos é maior que o último múltiplo de 30
-        if count > last_multiple and count % 30 == 0:
+        if count > last_multiple and count % num_marsami == 0:
             IDGame += 1  # Incrementar o IDGame
             write_last_id(Dir_IDGame, IDGame)
             last_multiple = count  # Atualizar o último múltiplo verificado

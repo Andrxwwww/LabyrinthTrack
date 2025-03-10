@@ -36,3 +36,14 @@ desvantagens: seria mais complicado a sincronizacao de informacoes sobre quantas
 - Porquê o uso de uma Thread para Queue ? e não p.ex cada Thread escrever diretamente no Mongo ?
 Como se trata de um grande volume de mensagens acaba por ser mais seguro haver um "buffer" ,[vanategns] este consegue evitar a concorrência ao acesso da base de dados 
 , melhorar o desempenho e reduzir a carga para o mongoDB [várias operações de escrita]
+
+#Extras:
+
+Contar o nº de marsamis no MongoDB , chegou-se a utilizar a aggregation. Porque é que nao se usou o .distinct() ?
+
+- apesar do .distinct() ser mais eficiente e simples , implicava dar load de todos os dados unicos para a memoria em client-side 
+que consequentemente trazia alta memory usage e slow performance, mas visto que se trata de 30 marsamis iremos considerar esta solução ,
+visto que nao se trata de um large dataset
+
+- em relação à aggregation acaba por ser processado em server-side (mongoDB) onde depois retorna so o resultado final o que acaba por ser mais eficiente
+quando são large datasets maiores
