@@ -1,5 +1,4 @@
 import threading
-import queue
 import paho.mqtt.client as mqtt
 from pymongo import MongoClient
 import time
@@ -32,9 +31,6 @@ collection_sound = db[MONGO_COLLECTION_SOUND]
 # Limpar todas as coleções **REMOVER DEPOIS**
 collection_move.delete_many({})
 collection_sound.delete_many({})
-
-# Fila para inserir mensagens no MongoDB
-message_queue = queue.Queue()
 
 # Contador de mensagens recebidas
 message_received = 0
@@ -71,8 +67,6 @@ def get_current_timestamp():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
 
 # Função para verificar se o número de Marsamis com Status: 2 é divisível por 30
-# FIXME: só funciona para o broker do dashboard e ninguem pode estar a rodar o jogo ao mesmo tempo
-# FIXME: o numero de marsamis está um bocado hardcoded
 def new_game():
     global IDGame, last_multiple
 
@@ -97,7 +91,7 @@ def new_game():
 def on_message(client, userdata, msg):
     global message_received, last_move_id, last_sound_id, IDGame
     payload = msg.payload.decode("utf-8")
-    print("Mensagem recebida:", payload)
+    print("[Cloud->MongoDB] Mensagem recebida:", payload)
 
     # Remover os caracteres '{' e '}' do início e do final do payload
     payload = payload.strip("{")
@@ -120,45 +114,38 @@ def on_message(client, userdata, msg):
             key, value = field.split(":")
             message[key.strip()] = int(value.strip())
 
-        message["Hora"] = get_current_timestamp() # Possivel erro ?????
+        message["Hora"] = get_current_timestamp()  # Possível erro ??????
         write_last_id(Dir_IDMove, last_move_id)
+
+        # Inserir no MongoDB
+        collection_move.insert_one(message)
+        print("[Cloud->MongoDB] Inserido no MongoDB:", message)
     elif msg.topic == MQTT_SOUND_TOPIC:
         # Exemplo de payload: "Player:15, Hour:2025-03-07 21:04:29.193352, Sound:19.2"
         # Separar os campos e criar um dicionário
         fields = payload.split(", ")
         message = {}
-        last_sound_id+=1
+        last_sound_id += 1
         message["IDGame"] = IDGame
         message["IDSound"] = last_sound_id
-        message["Hour"] = get_current_timestamp() # Possivel erro ?????
+        message["Hour"] = get_current_timestamp()  # Possível erro ??????
         message["Player"] = int(fields[0].split(":")[1])
         message["Sound"] = fields[2].split(":")[1]
         write_last_id(Dir_IDSound, last_sound_id)
-        
-    # Inserir na fila para processamento no MongoDB
-    message_queue.put((msg.topic, message))
+
+        # Inserir no MongoDB
+        collection_sound.insert_one(message)
+        print("[Cloud->MongoDB] Inserido no MongoDB:", message)
 
 # Função para subscrever a um tópico MQTT
 def mqtt_subscriber(topic):
-    print(f"1. A subscrever ao tópico {topic}...")
+    print(f"1. [Cloud->MongoDB] A subscrever ao tópico {topic}...")
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     client.on_message = on_message
     client.connect(MQTT_BROKER, MQTT_PORT, 60)
     client.subscribe(topic, qos=2)
-    print(f"2. Subscrito ao tópico {topic}, aguardando mensagens...")
+    print(f"2. [Cloud->MongoDB] Subscrito ao tópico {topic}, aguardando mensagens...")
     client.loop_forever()
-
-# Função para inserir mensagens no MongoDB
-def mongo_writer():
-    while True:
-        topic, message = message_queue.get()
-        if topic == MQTT_MOVE_TOPIC:
-            collection_move.insert_one(message)
-        elif topic == MQTT_SOUND_TOPIC:
-            collection_sound.insert_one(message)
-
-        print("Inserido no MongoDB:", message)
-        message_queue.task_done()
 
 def check_messages_received():
     while True:
@@ -172,22 +159,21 @@ def check_messages_received():
         total_count = mongo_count_move + mongo_count_sound
         print(f"Mensagens recebidas: {received_count} | Mensagens no MongoDB: {total_count} | Move: {mongo_count_move} | Sound: {mongo_count_sound}")
 
-# Iniciar threads
-mqtt_thread_move = threading.Thread(target=mqtt_subscriber, args=(MQTT_MOVE_TOPIC,), daemon=True)
-mqtt_thread_sound = threading.Thread(target=mqtt_subscriber, args=(MQTT_SOUND_TOPIC,), daemon=True)
-mongo_thread = threading.Thread(target=mongo_writer, daemon=True)
-check_thread = threading.Thread(target=check_messages_received, daemon=True) # To debugging
-new_game_thread = threading.Thread(target=new_game, daemon=True)
+if __name__ == "__main__":
 
-mqtt_thread_move.start()
-mqtt_thread_sound.start()
-mongo_thread.start()
-check_thread.start()
-new_game_thread.start()
+    # Iniciar threads
+    mqtt_thread_move = threading.Thread(target=mqtt_subscriber, args=(MQTT_MOVE_TOPIC,), daemon=True)
+    mqtt_thread_sound = threading.Thread(target=mqtt_subscriber, args=(MQTT_SOUND_TOPIC,), daemon=True)
+    # check_thread = threading.Thread(target=check_messages_received, daemon=True)  # For debugging
+    new_game_thread = threading.Thread(target=new_game, daemon=True)
 
-# Esperar que as threads terminem  [ Nao vao terminar por causa do loop_forever() ]
-mqtt_thread_move.join()
-mqtt_thread_sound.join()
-mongo_thread.join()
-check_thread.join()
-new_game_thread.join()
+    mqtt_thread_move.start()
+    mqtt_thread_sound.start()
+    # check_thread.start()
+    new_game_thread.start()
+
+    # Esperar que as threads terminem  [ Não vão terminar por causa do loop_forever() ]
+    mqtt_thread_move.join()
+    mqtt_thread_sound.join()
+    # check_thread.join()
+    new_game_thread.join()

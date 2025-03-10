@@ -18,28 +18,28 @@ IV. Na cmd correr:
 > game 15 2 1 broker.hivemq.com 1883
 
 #NOTAS:
-- Porquê é que foi usado 3 / 4 threads ? e não 2 ou 5 ?
+1. Porquê é que foi usado  3 threads ? e não 2 ou 4 ?
 Cada thread tem um propósito específico no sistema neste caso estes aqui:
 
-mqtt_thread_move -> Subscreve ao tópico de movimentos e processa mensagens MQTT
-mqtt_thread_sound -> Subscreve ao tópico de sons e processa mensagens MQTT
-mongo_thread -> Lê mensagens da fila (queue.Queue) e insere no MongoDB
+mqtt_thread_move -> Subscreve ao tópico de movimentos e processa mensagens MQTT e escreve para o topico pisid_mazemov_15
+mqtt_thread_sound -> Subscreve ao tópico de sons e processa mensagens MQTT e escreve para o topic pisid_mazesound_15
+new_game_thread -> Vai verificando quando é que é um jogo novo
 [esta nao é necessária] check_thread -> Monitora a quantidade de mensagens recebidas e inseridas no banco de dados
 
-Se p.ex fosse 2 Threads como 1 para ambos os topicos mqtt e outra para inserir os dados no mongo , o processamento das mensagens mqtt podia atrasar o armazenamento no MongoDB
-Com + threads apenas trazia + complexidade sem grande benefícios
+Se fosse usada 2 threads , uma delas teria de lidar tanto com o Moves como com o Sound o que poderia atrasar o processamento de mensagens , 
+4 threads tinhamos usado para 1 para queue só que não era necessário.
 
-- Porquê é nao foi usado p.ex 2 mains e 1 .bat file para correr ambos os topicos ?
+2. Porquê é nao foi usado p.ex 2 mains e 1 .bat file para correr ambos os topicos ?
 Acaba por ser uma escolha , como vantagens: seria p.ex se um dos processos travar o outro continuava a funcionar 
 desvantagens: seria mais complicado a sincronizacao de informacoes sobre quantas informacoes foram recebidas
 
-- Porquê o uso de uma Thread para Queue ? e não p.ex cada Thread escrever diretamente no Mongo ?
-Como se trata de um grande volume de mensagens acaba por ser mais seguro haver um "buffer" ,[vanategns] este consegue evitar a concorrência ao acesso da base de dados 
-, melhorar o desempenho e reduzir a carga para o mongoDB [várias operações de escrita]
+3. Porquê não o uso de uma Thread para Queue ? e porque cada Thread escrever diretamente para o MongoDB?
+Nós originalmente tinhamos chegado a fazer +1 thread para passar as mensagens para o MongoDB mas acabava por trazer algumas desvantagens como 
+o aumento da latência ao passar os dados por um "buffer" para o MongoDB e também porque o MongoDB acaba por lidar com múltiplas conexões concorrentes
 
 #Extras:
 
-Contar o nº de marsamis no MongoDB , chegou-se a utilizar a aggregation. Porque é que nao se usou o .distinct() ?
+4. Contar o nº de marsamis no MongoDB , chegou-se a utilizar a .distinct(). Porque é que nao se usou o aggregation ?
 
 - apesar do .distinct() ser mais eficiente e simples , implicava dar load de todos os dados unicos para a memoria em client-side 
 que consequentemente trazia alta memory usage e slow performance, mas visto que se trata de 30 marsamis iremos considerar esta solução ,
