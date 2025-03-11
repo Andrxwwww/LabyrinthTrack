@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Tempo de geração: 11-Mar-2025 às 00:33
+-- Tempo de geração: 11-Mar-2025 às 17:15
 -- Versão do servidor: 10.4.28-MariaDB
 -- versão do PHP: 8.2.4
 
@@ -20,6 +20,40 @@ SET time_zone = "+00:00";
 --
 -- Banco de dados: `pisis`
 --
+
+-- --------------------------------------------------------
+
+--
+-- Estrutura da tabela `corridor`
+--
+
+CREATE TABLE `corridor` (
+  `Rooma` int(11) NOT NULL,
+  `Roomb` int(11) NOT NULL,
+  `Distance` int(11) NOT NULL,
+  `ID` int(11) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+
+--
+-- Extraindo dados da tabela `corridor`
+--
+
+INSERT INTO `corridor` (`Rooma`, `Roomb`, `Distance`, `ID`) VALUES
+(1, 2, 16, 1),
+(1, 3, 20, 2),
+(2, 4, 20, 3),
+(2, 5, 20, 4),
+(3, 2, 20, 5),
+(4, 5, 20, 6),
+(5, 3, 20, 7),
+(5, 6, 20, 8),
+(5, 7, 20, 9),
+(6, 8, 20, 10),
+(7, 5, 20, 11),
+(8, 9, 20, 12),
+(8, 10, 20, 13),
+(9, 7, 20, 14),
+(10, 1, 20, 15);
 
 -- --------------------------------------------------------
 
@@ -84,6 +118,33 @@ CREATE TABLE `ocupacaolabirinto` (
 -- --------------------------------------------------------
 
 --
+-- Estrutura da tabela `setupmaze`
+--
+
+CREATE TABLE `setupmaze` (
+  `normalnoise` decimal(4,2) NOT NULL,
+  `numberrooms` int(11) NOT NULL,
+  `numbermarsamis` int(11) NOT NULL,
+  `numberplayers` int(11) NOT NULL,
+  `frozentime` int(11) NOT NULL,
+  `delaytime` int(11) NOT NULL,
+  `timemarsamilive` int(11) NOT NULL,
+  `noisevartoleration` decimal(5,2) NOT NULL,
+  `step` int(11) NOT NULL,
+  `ID` int(11) NOT NULL,
+  `minutesstep` decimal(3,2) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+
+--
+-- Extraindo dados da tabela `setupmaze`
+--
+
+INSERT INTO `setupmaze` (`normalnoise`, `numberrooms`, `numbermarsamis`, `numberplayers`, `frozentime`, `delaytime`, `timemarsamilive`, `noisevartoleration`, `step`, `ID`, `minutesstep`) VALUES
+(19.00, 10, 30, 40, 50, 3, 50, 2.50, 50, 0, 1.00);
+
+-- --------------------------------------------------------
+
+--
 -- Estrutura da tabela `sound`
 --
 
@@ -109,8 +170,21 @@ CREATE TABLE `utilizador` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
+-- Extraindo dados da tabela `utilizador`
+--
+
+INSERT INTO `utilizador` (`Nome`, `Telemovel`, `Tipo`, `Grupo`, `Email`) VALUES
+('ff', '22', '22', 22, '22');
+
+--
 -- Índices para tabelas despejadas
 --
+
+--
+-- Índices para tabela `corridor`
+--
+ALTER TABLE `corridor`
+  ADD PRIMARY KEY (`ID`);
 
 --
 -- Índices para tabela `jogo`
@@ -141,6 +215,12 @@ ALTER TABLE `ocupacaolabirinto`
   ADD KEY `IDJogo` (`IDJogo`);
 
 --
+-- Índices para tabela `setupmaze`
+--
+ALTER TABLE `setupmaze`
+  ADD PRIMARY KEY (`ID`);
+
+--
 -- Índices para tabela `sound`
 --
 ALTER TABLE `sound`
@@ -157,6 +237,12 @@ ALTER TABLE `utilizador`
 --
 -- AUTO_INCREMENT de tabelas despejadas
 --
+
+--
+-- AUTO_INCREMENT de tabela `corridor`
+--
+ALTER TABLE `corridor`
+  MODIFY `ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
 
 --
 -- AUTO_INCREMENT de tabela `jogo`

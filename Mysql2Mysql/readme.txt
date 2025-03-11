@@ -1,0 +1,1 @@
+Código do Vida Larga penso que já esta a funcionar é preciso depois ver o que é preciso alterar
