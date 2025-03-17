@@ -74,17 +74,17 @@ def new_game():
         time.sleep(5)  # Verificar a cada 5 segundos
 
         # Contar o número de documentos com Status: 2
-        count = collection_move.count_documents({"Status": 2})
+        num_marsami_2 = collection_move.count_documents({"Status": 2})
 
         # Obtém o num de marsamis de forma diferenciada
         num_marsami = len(collection_move.distinct("Marsami"))
         print(f"O NUMERO DE MARSAMIS É: {num_marsami}")
 
         # Verificar se o número de documentos é maior que o último múltiplo de 30
-        if count > last_multiple and count % num_marsami == 0:
+        if num_marsami_2 > last_multiple and num_marsami_2 % num_marsami == 0:
             IDGame += 1  # Incrementar o IDGame
             write_last_id(Dir_IDGame, IDGame)
-            last_multiple = count  # Atualizar o último múltiplo verificado
+            last_multiple = num_marsami_2  # Atualizar o último múltiplo verificado
             print(f"Novo jogo detectado! IDGame: {IDGame}")
 
 # Callback quando recebe uma mensagem
