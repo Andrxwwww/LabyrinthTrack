@@ -16,8 +16,8 @@ MONGO_COLLECTION_SOUND = MONGO_DB["Sound"]
 MQTT_BROKER = "mqtt-dashboard.com"  # Altere para o endereço do teu broker MQTT
 MQTT_PORT = 1883
 
-MQTT_MOVE_TOPIC = "Move_15"
-MQTT_SOUND_TOPIC = "Sound_15"
+MQTT_MOVE_TOPIC = "move_grupo15"
+MQTT_SOUND_TOPIC = "sound_grupo15"
 
 print("[MongoDB->MQTT] Conectando ao broker MQTT...")
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
