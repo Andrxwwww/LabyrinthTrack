@@ -109,9 +109,7 @@ def on_message(client, userdata, msg):
     if msg.topic == MQTT_MOVE_TOPIC:
         # Exemplo de payload: "Player:15, Marsami:24, RoomOrigin:8, RoomDestiny:9, Status:1"
         # Separar os campos e criar um dicionário
-        all_data_move = payload + ", IDGame:" + str(IDGame) + ", IDSound:" + str(last_move_id)
 
-        write_to_file("./CloudToMongo/Registos.txt", all_data_move)
         fields = payload.split(", ")
         message = {}
         last_move_id += 1
@@ -125,25 +123,24 @@ def on_message(client, userdata, msg):
         write_last_id(Dir_IDMove, last_move_id)
 
         # Inserir no MongoDB
-        # collection_move.insert_one(message)
+        collection_move.insert_one(message)
         print("[Cloud->MongoDB] Inserido no MongoDB:", message)
     elif msg.topic == MQTT_SOUND_TOPIC:
         # Exemplo de payload: "Player:15, Hour:2025-03-07 21:04:29.193352, Sound:19.2"
         # Separar os campos e criar um dicionário
-        all_data_sound = payload + ", IDGame:" + str(IDGame) + ", IDSound:" + str(last_sound_id)
-        write_to_file("./CloudToMongo/Registos.txt", all_data_sound )
+
         fields = payload.split(", ")
         message = {}
         last_sound_id += 1
         message["IDGame"] = IDGame
         message["IDSound"] = last_sound_id
-        message["Hour"] = get_current_timestamp()  # Possível erro ??????
+        message["Hour"] = get_current_timestamp()  # Possível erro ?????? por meter a hora que VEM DO PAYLOAD
         message["Player"] = int(fields[0].split(":")[1])
         message["Sound"] = fields[2].split(":")[1]
         write_last_id(Dir_IDSound, last_sound_id)
 
         # Inserir no MongoDB
-        # collection_sound.insert_one(message)
+        collection_sound.insert_one(message)
         print("[Cloud->MongoDB] Inserido no MongoDB:", message)
 
 # Função para subscrever a um tópico MQTT
