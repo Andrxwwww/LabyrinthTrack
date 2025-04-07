@@ -6,7 +6,7 @@ from datetime import datetime
 
 # Configurações MQTT
 # mqtt-dashboard.com broker.hivemq.com broker.emqx.io
-MQTT_BROKER = "mqtt-dashboard.com"
+MQTT_BROKER = "broker.emqx.io"
 MQTT_PORT = 1883
 MQTT_MOVE_TOPIC = "pisid_mazemov_15"  # Tópico para obter a info do movimento
 MQTT_SOUND_TOPIC = "pisid_mazesound_15"  # Tópico para obter a info do som
@@ -16,21 +16,21 @@ MONGO_URI = "mongodb://localhost:27017/"  # Ajustar conforme necessário
 MONGO_DB = "PISID_Maze"
 MONGO_COLLECTION_MOVE = "Move"
 MONGO_COLLECTION_SOUND = "Sound"
-
-# Diretórios para guardar os IDs
-Dir_IDMove = "./CloudToMongo/IDs/IDMove.txt"
-Dir_IDSound = "./CloudToMongo/IDs/IDSound.txt"
-Dir_IDGame = "./CloudToMongo/IDs/IDGame.txt"
+MONGO_COLLECTION_FAILED = "Failed"  # Coleção para guardar os dados que falharam a inserção
+MONGO_COLLECTION_LASTIDS = "LastIDs"  # Coleção para guardar os últimos IDs
 
 # Conectar ao MongoDB
 mongo_client = MongoClient(MONGO_URI)
 db = mongo_client[MONGO_DB]
 collection_move = db[MONGO_COLLECTION_MOVE]
 collection_sound = db[MONGO_COLLECTION_SOUND]
+collection_failed = db[MONGO_COLLECTION_FAILED]  # Coleção para guardar os dados que falharam a inserção
+collection_lastids = db[MONGO_COLLECTION_LASTIDS]  # Coleção para guardar os últimos IDs
 
 # Limpar todas as coleções **REMOVER DEPOIS**
 collection_move.delete_many({})
 collection_sound.delete_many({})
+collection_failed.delete_many({})
 
 # Contador de mensagens recebidas
 message_received = 0
@@ -39,32 +39,31 @@ lock = threading.Lock()  # Lock para garantir que a variável message_count é a
 # Variável para guardar o último múltiplo de 30 verificado
 last_multiple = 0
 
-# Função para ler o último ID de um ficheiro
-def read_last_id(filename):
-    try:
-        with open(filename,"r") as file:
-            return int(file.read().strip())
-    except FileNotFoundError:
-        return 1
-
-# Função para escrever o último ID num ficheiro
-def write_last_id(filename, id):
-    with open(filename,"w") as file:
-        file.write(str(id))
-
-def write_to_file(filename, data):
-    with open(filename, "a") as file:
-        file.write(data + "\n")
 
 # CLEANUP: Remover depois
-write_last_id(Dir_IDMove, 0)
-write_last_id(Dir_IDSound, 0)
-write_last_id(Dir_IDGame, 1)
+#document_lastIDs = {
+#   "LastIDGame": 1,
+#   "LastIDMove": 1,
+#   "LastIDSound": 1
+#}
+# Limpar a coleção LastIDs antes de inserir o novo documento
+# collection_lastids.insert_one(document_lastIDs)
 
-# Ler o último IDGame de um ficheiro
-last_move_id = read_last_id(Dir_IDMove)
-last_sound_id = read_last_id(Dir_IDSound)
-IDGame = read_last_id(Dir_IDGame)
+# Inicializar documento dos last IDs se não existir
+collection_lastids.replace_one({}, {
+    "LastIDGame": 1,
+    "LastIDMove": 0,
+    "LastIDSound": 0
+}, upsert=True)
+
+# Ler os valores atuais
+doc_last_ids = collection_lastids.find_one({})
+
+# Variáveis globais com os IDs
+IDGame = doc_last_ids.get("LastIDGame", 1)
+last_move_id = doc_last_ids.get("LastIDMove", 1)
+last_sound_id = doc_last_ids.get("LastIDSound", 1)
+
 
 # Função para obter o timestamp atual
 def get_current_timestamp():
@@ -87,7 +86,7 @@ def new_game():
         # Verificar se o número de documentos é maior que o último múltiplo de 30
         if num_marsami_2 > last_multiple and num_marsami_2 % num_marsami == 0:
             IDGame += 1  # Incrementar o IDGame
-            write_last_id(Dir_IDGame, IDGame)
+            collection_lastids.update_one({}, {"$set": {"LastIDGame": IDGame}})
             last_multiple = num_marsami_2  # Atualizar o último múltiplo verificado
             print(f"Novo jogo detectado! IDGame: {IDGame}")
 
@@ -120,7 +119,7 @@ def on_message(client, userdata, msg):
             message[key.strip()] = int(value.strip())
 
         message["Hora"] = get_current_timestamp()  # Possível erro ??????
-        write_last_id(Dir_IDMove, last_move_id)
+        collection_lastids.update_one({}, {"$set": {"LastIDMove": last_move_id}})
 
         # Inserir no MongoDB
         collection_move.insert_one(message)
@@ -137,7 +136,7 @@ def on_message(client, userdata, msg):
         message["Hour"] = get_current_timestamp()  # Possível erro ?????? por meter a hora que VEM DO PAYLOAD
         message["Player"] = int(fields[0].split(":")[1])
         message["Sound"] = fields[2].split(":")[1]
-        write_last_id(Dir_IDSound, last_sound_id)
+        collection_lastids.update_one({}, {"$set": {"LastIDSound": last_sound_id}})
 
         # Inserir no MongoDB
         collection_sound.insert_one(message)
