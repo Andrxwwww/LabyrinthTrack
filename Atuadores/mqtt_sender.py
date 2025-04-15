@@ -41,3 +41,26 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+"""
+========================================
+ COMO UTILIZAR O SCRIPT CLI:
+========================================
+
+1. Para abrir todas as portas:
+
+   python mqtt_sender.py --type OpenAllDoor
+
+2. Para fechar uma porta entre salas:
+
+   python mqtt_sender.py --type CloseDoor --room_origin 1 --room_destiny 3
+
+3. Para usar um jogador diferente:
+
+   python mqtt_sender.py --type OpenAllDoor --player 20
+
+4. Para definir broker, porta ou tópico diferentes:
+
+   python mqtt_sender.py --type CloseDoor --room_origin 1 --room_destiny 3 --broker test.mosquitto.org --port 1883 --topic maze/teste
+
+"""
