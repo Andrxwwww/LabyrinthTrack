@@ -6,14 +6,14 @@ import threading
 
 # Configuração do MongoDB
 MONGO_URI = MongoClient("mongodb://localhost:27017/")
-MONGO_DB = MONGO_URI["PISID_Maze"]
+MONGO_DB = MONGO_URI["Pisisdtestes"]    #alterar para o nome da base de dados
 
-MONGO_COLLECTION_MOVE = MONGO_DB["Move"]
-MONGO_COLLECTION_SOUND = MONGO_DB["Sound"]
+MONGO_COLLECTION_MOVE = MONGO_DB["medicoes"]   #alterar para o nome da colecao
+MONGO_COLLECTION_SOUND = MONGO_DB["sound"] #alterar para o nome da colecao
 
 # Configuração do MQTT
 # mqtt-dashboard.com broker.hivemq.com broker.emqx.io
-MQTT_BROKER = "mqtt-dashboard.com"  # Altere para o endereço do teu broker MQTT
+MQTT_BROKER = "broker.emqx.io"  # Altere para o endereço do teu broker MQTT
 MQTT_PORT = 1883
 
 MQTT_MOVE_TOPIC = "move_grupo15"
@@ -23,13 +23,14 @@ print("[MongoDB->MQTT] Conectando ao broker MQTT...")
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 client.connect(MQTT_BROKER, MQTT_PORT, 60)
 print("[MongoDB->MQTT] Conectado ao broker MQTT...")
-
+#client.loop_start()
 # Função para publicar dados
 def publish_data(collection, mqtt_topic):
     print(f"[MongoDB->MQTT] A iniciar publicacao para o topico {mqtt_topic}...")
     for documento in collection.find():
         mensagem = json.dumps(documento, default=str)  # Converte para JSON
         client.publish(mqtt_topic, mensagem)
+        time.sleep(0.5)
         print(f"[MongoDB->MQTT] Publicado: {mensagem}")
 
 if __name__ == "__main__":

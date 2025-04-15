@@ -11,15 +11,15 @@ db = mariadb.connect(
     host="127.0.0.1",
     user="root",
     password="",
-    database="pisis"
+    database="pisid_sql"
 )
 cursor = db.cursor()
 
 # Configuração do MQTT
 mqtt_broker = "broker.emqx.io"
 mqtt_port = 1883
-mqtt_topic_sound = "dadosmongodb/sound"
-mqtt_topic_medicoes = "dadosmongodb/medicoes"
+mqtt_topic_sound = "sound_grupo15"
+mqtt_topic_medicoes = "move_grupo15"
 
 # Callback para mensagens de SOUND
 def on_message_sound(client, userdata, msg):
