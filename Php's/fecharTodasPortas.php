@@ -1,11 +1,11 @@
--<?php
-    $db = "pisid_sql"; 
-	$dbhost = "localhost"; 
-	$username = $_POST["username"];
-	$password = $_POST["password"];
-	$conn = mysqli_connect($dbhost, $username, $password, $db);	
-	$sql = "CALL closeAllDoor()";
-	$result = mysqli_query($conn, $sql);
-	mysqli_close ($conn);
-	echo json_encode($result);
+<?php
+    $pythonPath = "C:\\Users\\bruno\\AppData\\Local\\Programs\\Python\\Python313\\python.exe";  // Caminho para o Python
+    $scriptPath = "C:\\Users\\bruno\\PISID_Scripts\\Atuadores\\mqtt_sender.py"; // Caminho para o script Python
+
+    $command = escapeshellcmd("$pythonPath $scriptPath --type CloseAllDoor");
+
+    $output = shell_exec($command);
+
+    header('Content-Type: application/json');
+    echo json_encode(["output" => $output]);
 ?>

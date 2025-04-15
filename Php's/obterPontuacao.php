@@ -1,11 +1,11 @@
--<?php
-    $db = "pisid_sql"; 
-	$dbhost = "localhost"; 
-	$username = $_POST["username"];
-	$password = $_POST["password"];
-	$conn = mysqli_connect($dbhost, $username, $password, $db);	
-	$sql = "CALL getPoints()";
-	$result = mysqli_query($conn, $sql);
-	mysqli_close ($conn);
-	echo json_encode($result);
+<?php
+    $player = 15;
+    $pythonPath = "C:\\Users\\bruno\\AppData\\Local\\Programs\\Python\\Python313\\python.exe";  // substituir conforme o caminho `where python`
+    $scriptPath = "C:\\Users\\bruno\\PISID_Scripts\\obterPontuacao.py";
+
+    $command = escapeshellcmd("$pythonPath $scriptPath " . escapeshellarg($player));
+    $output = shell_exec($command);
+    $data = ["resultado" => trim($output)];
+    header('Content-Type: application/json');
+    echo json_encode($data);
 ?>
