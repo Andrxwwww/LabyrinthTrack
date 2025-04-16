@@ -40,18 +40,8 @@ lock = threading.Lock()  # Lock para garantir que a variável message_count é a
 last_multiple = 0
 
 
-# CLEANUP: Remover depois
-#document_lastIDs = {
-#   "LastIDGame": 1,
-#   "LastIDMove": 1,
-#   "LastIDSound": 1
-#}
-# Limpar a coleção LastIDs antes de inserir o novo documento
-# collection_lastids.insert_one(document_lastIDs)
-
 # Inicializar documento dos last IDs se não existir
 collection_lastids.replace_one({}, {
-    "LastIDGame": 1,
     "LastIDMove": 0,
     "LastIDSound": 0
 }, upsert=True)
@@ -60,7 +50,6 @@ collection_lastids.replace_one({}, {
 doc_last_ids = collection_lastids.find_one({})
 
 # Variáveis globais com os IDs
-IDGame = doc_last_ids.get("LastIDGame", 1)
 last_move_id = doc_last_ids.get("LastIDMove", 1)
 last_sound_id = doc_last_ids.get("LastIDSound", 1)
 
@@ -68,27 +57,6 @@ last_sound_id = doc_last_ids.get("LastIDSound", 1)
 # Função para obter o timestamp atual
 def get_current_timestamp():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
-
-# Função para verificar se o número de Marsamis com Status: 2 é divisível por 30
-def new_game():
-    global IDGame, last_multiple
-
-    while True:
-        time.sleep(5)  # Verificar a cada 5 segundos
-
-        # Contar o número de documentos com Status: 2
-        num_marsami_2 = collection_move.count_documents({"Status": 2})
-
-        # Obtém o num de marsamis de forma diferenciada
-        num_marsami = len(collection_move.distinct("Marsami"))
-        print(f"O NUMERO DE MARSAMIS É: {num_marsami}")
-
-        # Verificar se o número de documentos é maior que o último múltiplo de 30
-        if num_marsami_2 > last_multiple and num_marsami_2 % num_marsami == 0:
-            IDGame += 1  # Incrementar o IDGame
-            collection_lastids.update_one({}, {"$set": {"LastIDGame": IDGame}})
-            last_multiple = num_marsami_2  # Atualizar o último múltiplo verificado
-            print(f"Novo jogo detectado! IDGame: {IDGame}")
 
 # Callback quando recebe uma mensagem
 def on_message(client, userdata, msg):
@@ -112,13 +80,12 @@ def on_message(client, userdata, msg):
         fields = payload.split(", ")
         message = {}
         last_move_id += 1
-        message["IDGame"] = IDGame
         message["IDMove"] = last_move_id
         for field in fields:
             key, value = field.split(":")
             message[key.strip()] = int(value.strip())
 
-        message["Hora"] = get_current_timestamp()  # Possível erro ??????
+        message["Hora"] = get_current_timestamp()
         collection_lastids.update_one({}, {"$set": {"LastIDMove": last_move_id}})
 
         # Inserir no MongoDB
@@ -131,9 +98,8 @@ def on_message(client, userdata, msg):
         fields = payload.split(", ")
         message = {}
         last_sound_id += 1
-        message["IDGame"] = IDGame
         message["IDSound"] = last_sound_id
-        message["Hour"] = get_current_timestamp()  # Possível erro ?????? por meter a hora que VEM DO PAYLOAD
+        message["Hour"] = get_current_timestamp()
         message["Player"] = int(fields[0].split(":")[1])
         message["Sound"] = fields[2].split(":")[1]
         collection_lastids.update_one({}, {"$set": {"LastIDSound": last_sound_id}})
@@ -152,6 +118,7 @@ def mqtt_subscriber(topic):
     print(f"2. [Cloud->MongoDB] Subscrito ao tópico {topic}, aguardando mensagens...")
     client.loop_forever()
 
+# Funcao para verificar se as mensagens foram recebidas
 def check_messages_received():
     while True:
         time.sleep(10)  # Verificar a cada 10 segundos
@@ -169,16 +136,13 @@ if __name__ == "__main__":
     # Iniciar threads
     mqtt_thread_move = threading.Thread(target=mqtt_subscriber, args=(MQTT_MOVE_TOPIC,), daemon=True)
     mqtt_thread_sound = threading.Thread(target=mqtt_subscriber, args=(MQTT_SOUND_TOPIC,), daemon=True)
-    # check_thread = threading.Thread(target=check_messages_received, daemon=True)  # For debugging
-    new_game_thread = threading.Thread(target=new_game, daemon=True)
+    check_thread = threading.Thread(target=check_messages_received, daemon=True)  # For debugging
 
     mqtt_thread_move.start()
     mqtt_thread_sound.start()
-    # check_thread.start()
-    new_game_thread.start()
+    check_thread.start()
 
     # Esperar que as threads terminem  [ Não vão terminar por causa do loop_forever() ]
     mqtt_thread_move.join()
     mqtt_thread_sound.join()
-    # check_thread.join()
-    new_game_thread.join()
+    check_thread.join()
