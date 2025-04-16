@@ -36,10 +36,6 @@ collection_failed.delete_many({})
 message_received = 0
 lock = threading.Lock()  # Lock para garantir que a variável message_count é atualizada corretamente
 
-# Variável para guardar o último múltiplo de 30 verificado
-last_multiple = 0
-
-
 # Inicializar documento dos last IDs se não existir
 collection_lastids.replace_one({}, {
     "LastIDMove": 0,
@@ -136,13 +132,13 @@ if __name__ == "__main__":
     # Iniciar threads
     mqtt_thread_move = threading.Thread(target=mqtt_subscriber, args=(MQTT_MOVE_TOPIC,), daemon=True)
     mqtt_thread_sound = threading.Thread(target=mqtt_subscriber, args=(MQTT_SOUND_TOPIC,), daemon=True)
-    check_thread = threading.Thread(target=check_messages_received, daemon=True)  # For debugging
+    #check_thread = threading.Thread(target=check_messages_received, daemon=True)  # For debugging
 
     mqtt_thread_move.start()
     mqtt_thread_sound.start()
-    check_thread.start()
+    #check_thread.start()
 
     # Esperar que as threads terminem  [ Não vão terminar por causa do loop_forever() ]
     mqtt_thread_move.join()
     mqtt_thread_sound.join()
-    check_thread.join()
+    #check_thread.join()
