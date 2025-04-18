@@ -33,6 +33,13 @@ def on_message_sound(client, userdata, msg):
         cursor.execute("INSERT INTO sound (IDSound,Sound, IdJogo, Hour) VALUES (%s,%s, %s, %s)", (mongoid,sound, idjogo, hour))
         db.commit()
         print(f"Guardado no MySQL (SOUND): {dados}")
+        ##enviar o ack para o mongo
+        ack_message = json.dumps({
+            "_id_mongoid": mongoid,
+            "collection": "sound"  # identifica a coleção certa
+        })
+        client.publish("ack_grupo15", ack_message)
+        print(f"[MQTT->MySQL] Enviado ACK para {mongoid}")
 
     except Exception as e:
         print(f"Erro ao processar mensagem SOUND: {e}")
@@ -61,6 +68,13 @@ def on_message_medicoes(client, userdata, msg):
         db.commit()
 
         print(f"Guardado no MySQL (MEDIÇÕES): {dados}")
+        #enviar o ack para o mongo
+        ack_message = json.dumps({
+            "_id_mongoid": mongoid,
+            "collection": "medicoes"  # ou "sound", conforme a coleção certa
+        })
+        client.publish("ack_grupo15", ack_message)
+        print(f"[MQTT->MySQL] Enviado ACK para {mongoid}")
 
     except Exception as e:
         print(f"Erro ao processar mensagem MEDIÇÕES: {e}")
