@@ -1,3 +1,4 @@
+from datetime import datetime
 import paho.mqtt.client as mqtt
 import mariadb
 import json
@@ -25,21 +26,23 @@ mqtt_topic_medicoes = "move_grupo15"
 def on_message_sound(client, userdata, msg):
     try:
         dados = json.loads(msg.payload.decode())
-        mongoid=dados.get("_id_mongoid")  #
+        id_sound = dados.get("IDSound")  #
         sound = dados.get("Sound")
         hour = dados.get("Hour")
         idjogo = 1  # Hardcoded
+
         createGame(idjogo)
-        cursor.execute("INSERT INTO sound (IDSound,Sound, IdJogo, Hour) VALUES (%s,%s, %s, %s)", (mongoid,sound, idjogo, hour))
+
+        cursor.execute("INSERT INTO sound (IDSound,Sound, IdJogo, Hour) VALUES (%s,%s, %s, %s)", (id_sound,sound, idjogo, hour))
         db.commit()
         print(f"Guardado no MySQL (SOUND): {dados}")
         ##enviar o ack para o mongo
         ack_message = json.dumps({
-            "_id_mongoid": mongoid,
-            "collection": "sound"  # identifica a coleção certa
+            "IDMongo": id_sound,
+            "collection": "Sound"  # identifica a coleção certa
         })
         client.publish("ack_grupo15", ack_message)
-        print(f"[MQTT->MySQL] Enviado ACK para {mongoid}")
+        print(f"[MQTT->MySQL] Enviado ACK para {id_sound}")
 
     except Exception as e:
         print(f"Erro ao processar mensagem SOUND: {e}")
@@ -49,32 +52,33 @@ def on_message_medicoes(client, userdata, msg):
     try:
 
         dados = json.loads(msg.payload.decode())
-        mongoid = dados.get("_id_mongoid") ## este nome foi só para testes
+        id_move = dados.get("IDMove") ## este nome foi só para testes
         player = dados.get("Player")
         marsami = dados.get("Marsami")
         room_origin = dados.get("RoomOrigin")
         room_destiny = dados.get("RoomDestiny")
         status = dados.get("Status")
-        hour = dados.get("Hour")
+        hour = dados.get("Hora")
         idjogo = 1  # Hardcoded
 
         # Para criar a tabela jogos
         createGame(idjogo)
-        mazeOcupation(msg)
+        # mazeOcupation(msg)
         cursor.execute(
-            "INSERT INTO medicoespassagens (IDMedicao,SalaOrigem,SalaDestino, Marsami,Status,IDJogo) VALUES (%s, %s, %s, %s, %s, %s)",
-            (mongoid,room_origin, room_destiny,marsami,status,idjogo)
+            "INSERT INTO medicoespassagens (IDMedicao,Hora,SalaOrigem,SalaDestino, Marsami,Status,IDJogo) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+            (id_move, hour ,room_origin, room_destiny,marsami,status,idjogo)
         )
         db.commit()
+        
 
         print(f"Guardado no MySQL (MEDIÇÕES): {dados}")
         #enviar o ack para o mongo
         ack_message = json.dumps({
-            "_id_mongoid": mongoid,
-            "collection": "medicoes"  # ou "sound", conforme a coleção certa
+            "IDMongo": id_move,
+            "collection": "Move"  # ou "sound", conforme a coleção certa
         })
         client.publish("ack_grupo15", ack_message)
-        print(f"[MQTT->MySQL] Enviado ACK para {mongoid}")
+        print(f"[MQTT->MySQL] Enviado ACK para {id_move}")
 
     except Exception as e:
         print(f"Erro ao processar mensagem MEDIÇÕES: {e}")
@@ -96,8 +100,6 @@ def mazeOcupation(msg):
     global current_game
     dados = json.loads(msg.payload.decode())
 
-    mongoid = dados.get("_id_mongoid")  # ID do MongoDB (só para testes)
-    player = dados.get("Player")
     marsami = dados.get("Marsami")
     room_origin = dados.get("RoomOrigin")  # Obtém a sala de origem
     room_destiny = dados.get("RoomDestiny")  # Obtém a sala de destino
@@ -159,14 +161,15 @@ def start_mqtt_client(topic, on_message_callback):
     print(f"A ouvir mensagens MQTT no tópico {topic}...")
     client.loop_forever()
 
-# Criar duas threads para os dois tópicos
-thread_sound = threading.Thread(target=start_mqtt_client, args=(mqtt_topic_sound, on_message_sound))
-thread_medicoes = threading.Thread(target=start_mqtt_client, args=(mqtt_topic_medicoes, on_message_medicoes))
+if __name__ == "__main__":
+    # Criar duas threads para os dois tópicos
+    thread_sound = threading.Thread(target=start_mqtt_client, args=(mqtt_topic_sound, on_message_sound))
+    thread_medicoes = threading.Thread(target=start_mqtt_client, args=(mqtt_topic_medicoes, on_message_medicoes))
 
-# Iniciar as threads
-thread_sound.start()
-thread_medicoes.start()
+    # Iniciar as threads
+    thread_sound.start()
+    thread_medicoes.start()
 
-# Esperar as threads terminarem (caso seja necessário)
-thread_sound.join()
-thread_medicoes.join()
+    # Esperar as threads terminarem (caso seja necessário)
+    thread_sound.join()
+    thread_medicoes.join()

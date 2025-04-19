@@ -167,23 +167,24 @@ print("[MongoDB->MQTT] Conectado ao broker MQTT...")
 def on_message_ack(client, userdata, msg):
     try:
         dados = json.loads(msg.payload.decode())
-        mongoid = int(dados.get("_id_mongoid"))
+        print(f"[MongoDB->MQTT] ACK recebido: {dados}")
         collection_name = dados.get("collection")
+        print(f"[MongoDB->MQTT] Nome da coleção: {collection_name}")
 
-        if not mongoid or not collection_name:
-            print("[MongoDB->MQTT] ACK inválido: faltam campos")
-            return
+        if collection_name == "Move":
+            id_move = dados.get("IDMongo")
+            collection_move.update_one({"IDMove": id_move}, {"$set": {"IsMigrated": True}})
+            print(f"[MongoDB->MQTT] IDMove: {id_move} atualizado para IsMigrated: True")
 
+        elif collection_name == "Sound":
+            id_sound = dados.get("IDMongo")
+            collection_sound.update_one({"IDSound": id_sound}, {"$set": {"IsMigrated": True}})
+            print(f"[MongoDB->MQTT] IDSound: {id_sound} atualizado para IsMigrated: True")
 
-        if collection_name == "medicoes":
-            MONGO_COLLECTION_MOVE.update_one({"_id_mongoid": mongoid}, {"$set": {"IsMigrated": True}})
-        elif collection_name == "sound":
-            MONGO_COLLECTION_SOUND.update_one({"_id_mongoid": mongoid}, {"$set": {"IsMigrated": True}})
         else:
             print(f"[MongoDB->MQTT] Nome de coleção desconhecido: {collection_name}")
-            return
-
-        print(f"[MongoDB->MQTT] Marcado como migrado: {mongoid} na coleção {collection_name}")
+            collection_failed.insert_one(dados)  # Guardar na coleção Failed
+            print(f"[MongoDB->MQTT] Documento inválido guardado em 'Failed': {dados}")
 
     except Exception as e:
         print(f"[MongoDB->MQTT] Erro ao processar ACK: {e}")
@@ -193,7 +194,7 @@ client.subscribe(MQTT_ACK_TOPIC)
 client.loop_start()
 
 # Publicar apenas documentos que ainda não foram migrados
-def publish_data(collection, mqtt_topic, collection_name):
+def publish_data(collection, mqtt_topic):
     print(f"[MongoDB->MQTT] A iniciar publicação contínua para o tópico {mqtt_topic}...")
 
     while True:
@@ -201,43 +202,41 @@ def publish_data(collection, mqtt_topic, collection_name):
         for documento in collection.find({"IsMigrated": {"$ne": True}}):
             documentos_encontrados = True
             mensagem = documento.copy()
-            mensagem["_id_mongoid"] = str(mensagem["_id_mongoid"])
-            mensagem["collection"] = collection_name
 
-            publicar = False
             if mqtt_topic == MQTT_MOVE_TOPIC:
                 if validar_movimento(documento):
-                    publicar = True
+                    mensagem_json = json.dumps(mensagem, default=str)
+                    print(f"[MongoDB->MQTT] Publicado Move (VALIDADO): {mensagem_json}")
+                    client.publish(mqtt_topic, mensagem_json)
                 else:
                     collection_failed.insert_one(documento)
-                    print(f"[MongoDB->MQTT] Documento inválido (MOVE) guardado em 'Failed': {documento}")
+                    print(f"[MongoDB->MQTT] Documento Move (INVÁLIDO) guardado em 'Failed': {documento}")
 
             elif mqtt_topic == MQTT_SOUND_TOPIC:
                 if validar_sound(documento):
-                    publicar = True
+                    mensagem_json = json.dumps(mensagem, default=str)
+                    print(f"[MongoDB->MQTT] Publicado Sound (VALIDADO): {mensagem_json}")
+                    client.publish(mqtt_topic, mensagem_json)
                 else:
                     collection_failed.insert_one(documento)
-                    print(f"[MongoDB->MQTT] Documento inválido (SOUND) guardado em 'Failed': {documento}")
+                    print(f"[MongoDB->MQTT] Documento Sound (INVÁLIDO) guardado em 'Failed': {documento}")
 
             else:
-                publicar = True  # Sem validação para outros tópicos
+                print(f"[MongoDB->MQTT] Tópico desconhecido: {mqtt_topic}")
+                collection_failed.insert_one(documento)
 
-            if publicar:
-                mensagem_json = json.dumps(mensagem, default=str)
-                client.publish(mqtt_topic, mensagem_json)
-                print(f"[MongoDB->MQTT] Publicado: {mensagem_json}")
-                time.sleep(0.3)  # Delay para evitar flood
+            time.sleep(1) 
 
         if not documentos_encontrados:
-            print(f"[MongoDB->MQTT] Nenhum novo documento para {collection_name}.")
+            print(f"[MongoDB->MQTT] Nenhum novo documento .")
 
         time.sleep(5)  # Espera antes da próxima verificação
 
 
 # Início da aplicação
 if __name__ == "__main__":
-    thread_move = threading.Thread(target=publish_data, args=(MONGO_COLLECTION_MOVE, MQTT_MOVE_TOPIC, "medicoes"))
-    thread_sound = threading.Thread(target=publish_data, args=(MONGO_COLLECTION_SOUND, MQTT_SOUND_TOPIC, "sound"))
+    thread_move = threading.Thread(target=publish_data, args=(collection_move, MQTT_MOVE_TOPIC))
+    thread_sound = threading.Thread(target=publish_data, args=(collection_sound, MQTT_SOUND_TOPIC))
 
     thread_move.start()
     thread_sound.start()

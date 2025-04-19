@@ -56,7 +56,7 @@ def get_current_timestamp():
 
 # Callback quando recebe uma mensagem
 def on_message(client, userdata, msg):
-    global message_received, last_move_id, last_sound_id, IDGame
+    global message_received, last_move_id, last_sound_id
     payload = msg.payload.decode("utf-8")
     print("[Cloud->MongoDB] Mensagem recebida:", payload)
 
@@ -71,7 +71,6 @@ def on_message(client, userdata, msg):
     # Processar a mensagem conforme o tópico
     if msg.topic == MQTT_MOVE_TOPIC:
         # Exemplo de payload: "Player:15, Marsami:24, RoomOrigin:8, RoomDestiny:9, Status:1"
-        # Separar os campos e criar um dicionário
 
         fields = payload.split(", ")
         message = {}
@@ -81,6 +80,7 @@ def on_message(client, userdata, msg):
             key, value = field.split(":")
             message[key.strip()] = int(value.strip())
 
+        message["IsMigrated"] = False
         message["Hora"] = get_current_timestamp()
         collection_lastids.update_one({}, {"$set": {"LastIDMove": last_move_id}})
 
@@ -89,7 +89,6 @@ def on_message(client, userdata, msg):
         print("[Cloud->MongoDB] Inserido no MongoDB:", message)
     elif msg.topic == MQTT_SOUND_TOPIC:
         # Exemplo de payload: "Player:15, Hour:2025-03-07 21:04:29.193352, Sound:19.2"
-        # Separar os campos e criar um dicionário
 
         fields = payload.split(", ")
         message = {}
@@ -98,6 +97,7 @@ def on_message(client, userdata, msg):
         message["Hour"] = get_current_timestamp()
         message["Player"] = int(fields[0].split(":")[1])
         message["Sound"] = fields[2].split(":")[1]
+        message["IsMigrated"] = False  
         collection_lastids.update_one({}, {"$set": {"LastIDSound": last_sound_id}})
 
         # Inserir no MongoDB
