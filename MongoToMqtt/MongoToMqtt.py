@@ -14,6 +14,7 @@ MQTT_PORT = 1883
 MQTT_MOVE_TOPIC = "move_grupo15"
 MQTT_SOUND_TOPIC = "sound_grupo15"
 MQTT_ACK_TOPIC = "ack_grupo15"
+MQTT_FAILED_TOPIC = "failed_grupo15"  # Tópico para mensagens inválidas
 
 # CONSTANTES da Configuração do MongoDB
 MONGO_URI = "mongodb://localhost:27017/"
@@ -79,7 +80,7 @@ def verifyMovimentoValido(roomOrigin, roomDestiny):
         print(f"Erro ao conectar ou consultar a base de dados: {e}")
         return False
 
-#TODO: VALIDAR AS MENSAGENS DE MOVIMENTO EM SI E FAZER NO MQTT->MONGODB
+
 def validar_movimento(doc):
     try:
         marsami = int(doc.get("Marsami"))
@@ -189,9 +190,31 @@ def on_message_ack(client, userdata, msg):
     except Exception as e:
         print(f"[MongoDB->MQTT] Erro ao processar ACK: {e}")
 
-client.on_message = on_message_ack
+def on_message_failed(client, userdata, msg):
+    try:
+        dados = json.loads(msg.payload.decode())
+        print(f"[MongoDB->MQTT] Mensagem recebida no tópico FAILED: {dados}")
+
+        collection_failed.insert_one(dados)
+        print(f"[MongoDB->MQTT] Documento inserido na coleção 'Failed'")
+        
+    except Exception as e:
+        print(f"[MongoDB->MQTT] Erro ao processar mensagem do tópico FAILED: {e}")
+
+
+def on_message(client, userdata, msg):
+    if msg.topic == MQTT_ACK_TOPIC:
+        on_message_ack(client, userdata, msg)
+    elif msg.topic == MQTT_FAILED_TOPIC:
+        on_message_failed(client, userdata, msg)
+    else:
+        print(f"[MongoDB->MQTT] Mensagem recebida num tópico não tratado: {msg.topic}")
+
+client.on_message = on_message
 client.subscribe(MQTT_ACK_TOPIC)
+client.subscribe(MQTT_FAILED_TOPIC)
 client.loop_start()
+
 
 # Publicar apenas documentos que ainda não foram migrados
 def publish_data(collection, mqtt_topic):
@@ -247,3 +270,10 @@ if __name__ == "__main__":
     client.loop_stop()
     client.disconnect()
     print("[MongoDB->MQTT] Finalizado.")
+
+# dar update de true para false pelo mongocompass
+#{
+#  "$set": {
+#    "IsMigrated": false
+#  }
+#}

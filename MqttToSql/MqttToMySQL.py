@@ -17,10 +17,48 @@ db = mariadb.connect(
 cursor = db.cursor()
 
 # Configuração do MQTT
-mqtt_broker = "broker.emqx.io"
-mqtt_port = 1883
-mqtt_topic_sound = "sound_grupo15"
-mqtt_topic_medicoes = "move_grupo15"
+MQTT_BROKER = "broker.emqx.io"
+MQTT_PORT = 1883
+MQTT_SOUND_TOPIC = "sound_grupo15"
+MQTT_MOVE_TOPIC = "move_grupo15"
+MQTT_ACK_TOPIC = "ack_grupo15"
+MQTT_FAILED_TOPIC = "failed_grupo15"
+
+# Obter uma constante (config) a partir do MySQL
+def get_config(chave):
+    cursor.execute("SELECT valor FROM configs WHERE chave = %s", (chave,))
+    resultado = cursor.fetchone()
+    if resultado:
+        return resultado[0]
+    else:
+        raise ValueError(f"[MQTT->MySQL] Configuração '{chave}' não encontrada.")
+
+# Função para validar mensagens de movimento
+# TODO: Falta o MongoToMQTT receber as mensagens que estão nesse topico
+def validar_mensagem_move(doc):
+
+    status_ok = int(get_config("status_tudoOK"))
+    status_fail = int(get_config("status_nenhuma_porta"))
+    status_cansado = int(get_config("status_cansado"))
+    sala_min = int(get_config("num_sala_min"))
+    sala_max = int(get_config("num_sala_max"))
+
+    origem = doc.get("RoomOrigin")
+    destino = doc.get("RoomDestiny")
+    status = doc.get("Status")
+
+    # Validação 4: Sala origem igual ao mínimo e destino dentro do intervalo, status OK
+    if (origem == sala_min or sala_min < destino <= sala_max) and status == status_ok:
+        return True
+    # Validação 5: Origem e destino iguais ao mínimo, status é "nenhuma porta" ou "cansado"
+    if (origem == sala_min or destino == sala_min) and status in [status_fail, status_cansado]:
+        return True
+    # Validação 6: Origem e destino dentro do intervalo, status OK
+    if (sala_min < origem <= sala_max or sala_min < destino <= sala_max) and status == status_ok:
+        return True
+    
+    return False
+
 
 # Callback para mensagens de SOUND
 def on_message_sound(client, userdata, msg):
@@ -35,17 +73,17 @@ def on_message_sound(client, userdata, msg):
 
         cursor.execute("INSERT INTO sound (IDSound,Sound, IdJogo, Hour) VALUES (%s,%s, %s, %s)", (id_sound,sound, idjogo, hour))
         db.commit()
-        print(f"Guardado no MySQL (SOUND): {dados}")
+        print(f"[MQTT->MySQL] Guardado no MySQL (SOUND): {dados}")
         ##enviar o ack para o mongo
         ack_message = json.dumps({
             "IDMongo": id_sound,
             "collection": "Sound"  # identifica a coleção certa
         })
-        client.publish("ack_grupo15", ack_message)
+        client.publish(MQTT_ACK_TOPIC, ack_message)
         print(f"[MQTT->MySQL] Enviado ACK para {id_sound}")
 
     except Exception as e:
-        print(f"Erro ao processar mensagem SOUND: {e}")
+        print(f"[MQTT->MySQL] Erro ao processar mensagem SOUND: {e}")
 
 # Callback para mensagens de MEDIÇÕES
 def on_message_medicoes(client, userdata, msg):
@@ -53,7 +91,6 @@ def on_message_medicoes(client, userdata, msg):
 
         dados = json.loads(msg.payload.decode())
         id_move = dados.get("IDMove") ## este nome foi só para testes
-        player = dados.get("Player")
         marsami = dados.get("Marsami")
         room_origin = dados.get("RoomOrigin")
         room_destiny = dados.get("RoomDestiny")
@@ -63,25 +100,31 @@ def on_message_medicoes(client, userdata, msg):
 
         # Para criar a tabela jogos
         createGame(idjogo)
-        # mazeOcupation(msg)
-        cursor.execute(
-            "INSERT INTO medicoespassagens (IDMedicao,Hora,SalaOrigem,SalaDestino, Marsami,Status,IDJogo) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-            (id_move, hour ,room_origin, room_destiny,marsami,status,idjogo)
-        )
-        db.commit()
+        if not validar_mensagem_move(dados):
+            client.publish(MQTT_FAILED_TOPIC, json.dumps(dados))
+            print(f"[MQTT->MySQL] Mensagem inválida: {dados}")
+            return
+        else:
+            cursor.execute(
+                "INSERT INTO medicoespassagens (IDMedicao,Hora,SalaOrigem,SalaDestino, Marsami,Status,IDJogo) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                (id_move, hour ,room_origin, room_destiny,marsami,status,idjogo)
+            )
+            db.commit()
+            print(f"[MQTT->MySQL] Guardado no MySQL (MEDIÇÕES): {dados}")
         
-
-        print(f"Guardado no MySQL (MEDIÇÕES): {dados}")
         #enviar o ack para o mongo
         ack_message = json.dumps({
             "IDMongo": id_move,
             "collection": "Move"  # ou "sound", conforme a coleção certa
         })
-        client.publish("ack_grupo15", ack_message)
+        client.publish(MQTT_ACK_TOPIC, ack_message)
+
+        #mazeOcupation(marsami, room_origin, room_destiny)
+
         print(f"[MQTT->MySQL] Enviado ACK para {id_move}")
 
     except Exception as e:
-        print(f"Erro ao processar mensagem MEDIÇÕES: {e}")
+        print(f"[MQTT->MySQL] Erro ao processar mensagem MEDIÇÕES: {e}")
 
 def createGame(idjogo):
     global current_game
@@ -93,16 +136,12 @@ def createGame(idjogo):
                 (idjogo,)
             )
             db.commit()
-            print(f"Guardado no MySQL (Jogo): {idjogo}")
+            print(f"[MQTT->MySQL] Guardado no MySQL (Jogo): {idjogo}")
 
 ## if tabela n exite cria else dá update
-def mazeOcupation(msg):
+def mazeOcupation(marsami, room_origin, room_destiny):
     global current_game
-    dados = json.loads(msg.payload.decode())
 
-    marsami = dados.get("Marsami")
-    room_origin = dados.get("RoomOrigin")  # Obtém a sala de origem
-    room_destiny = dados.get("RoomDestiny")  # Obtém a sala de destino
     idjogo = 1  # Hardcoded
 
     with current_game_lock:
@@ -156,15 +195,15 @@ def mazeOcupation(msg):
 def start_mqtt_client(topic, on_message_callback):
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     client.on_message = on_message_callback
-    client.connect(mqtt_broker, mqtt_port, 60)
+    client.connect(MQTT_BROKER, MQTT_PORT, 60)
     client.subscribe(topic)
-    print(f"A ouvir mensagens MQTT no tópico {topic}...")
+    print(f"[MQTT->MySQL] A ouvir mensagens MQTT no tópico {topic}...")
     client.loop_forever()
 
 if __name__ == "__main__":
     # Criar duas threads para os dois tópicos
-    thread_sound = threading.Thread(target=start_mqtt_client, args=(mqtt_topic_sound, on_message_sound))
-    thread_medicoes = threading.Thread(target=start_mqtt_client, args=(mqtt_topic_medicoes, on_message_medicoes))
+    thread_sound = threading.Thread(target=start_mqtt_client, args=(MQTT_SOUND_TOPIC, on_message_sound))
+    thread_medicoes = threading.Thread(target=start_mqtt_client, args=(MQTT_MOVE_TOPIC, on_message_medicoes))
 
     # Iniciar as threads
     thread_sound.start()
