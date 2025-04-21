@@ -80,6 +80,14 @@ def verifyMovimentoValido(roomOrigin, roomDestiny):
         print(f"Erro ao conectar ou consultar a base de dados: {e}")
         return False
 
+def convert_data_for_failedCollection(dados, report):
+    return {
+        "IDMessage": dados.get("IDMove") or dados.get("IDSound"),
+        "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "Message": dados,
+        "Report": report
+    }
+
 
 def validar_movimento(doc):
     try:
@@ -184,7 +192,8 @@ def on_message_ack(client, userdata, msg):
 
         else:
             print(f"[MongoDB->MQTT] Nome de coleção desconhecido: {collection_name}")
-            collection_failed.insert_one(dados)  # Guardar na coleção Failed
+
+            collection_failed.insert_one(convert_data_for_failedCollection(dados,"1.Colecao Desconhecida"))  # Guardar na coleção Failed
             print(f"[MongoDB->MQTT] Documento inválido guardado em 'Failed': {dados}")
 
     except Exception as e:
@@ -232,7 +241,7 @@ def publish_data(collection, mqtt_topic):
                     print(f"[MongoDB->MQTT] Publicado Move (VALIDADO): {mensagem_json}")
                     client.publish(mqtt_topic, mensagem_json)
                 else:
-                    collection_failed.insert_one(documento)
+                    collection_failed.insert_one(convert_data_for_failedCollection(documento,"2.[Mongo->MQTT] Movimento Invalido"))  # Guardar na coleção Failed
                     print(f"[MongoDB->MQTT] Documento Move (INVÁLIDO) guardado em 'Failed': {documento}")
 
             elif mqtt_topic == MQTT_SOUND_TOPIC:
@@ -241,12 +250,11 @@ def publish_data(collection, mqtt_topic):
                     print(f"[MongoDB->MQTT] Publicado Sound (VALIDADO): {mensagem_json}")
                     client.publish(mqtt_topic, mensagem_json)
                 else:
-                    collection_failed.insert_one(documento)
+                    collection_failed.insert_one(convert_data_for_failedCollection(documento,"3.[Mongo->MQTT] Som Invalido"))
                     print(f"[MongoDB->MQTT] Documento Sound (INVÁLIDO) guardado em 'Failed': {documento}")
 
             else:
                 print(f"[MongoDB->MQTT] Tópico desconhecido: {mqtt_topic}")
-                collection_failed.insert_one(documento)
 
             time.sleep(1) 
 
