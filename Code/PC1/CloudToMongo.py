@@ -1,31 +1,9 @@
 import threading
 import paho.mqtt.client as mqtt
-from pymongo import MongoClient
 import time
 from datetime import datetime
 
-# Configurações MQTT
-# mqtt-dashboard.com broker.hivemq.com broker.emqx.io
-MQTT_BROKER = "broker.emqx.io"
-MQTT_PORT = 1883
-MQTT_MOVE_TOPIC = "pisid_mazemov_15"  # Tópico para obter a info do movimento
-MQTT_SOUND_TOPIC = "pisid_mazesound_15"  # Tópico para obter a info do som
-
-# Configurações MongoDB
-MONGO_URI = "mongodb://localhost:27017/"  # Ajustar conforme necessário
-MONGO_DB = "PISID_Maze"
-MONGO_COLLECTION_MOVE = "Move"
-MONGO_COLLECTION_SOUND = "Sound"
-MONGO_COLLECTION_FAILED = "Failed"  # Coleção para guardar os dados que falharam a inserção
-MONGO_COLLECTION_LASTIDS = "LastIDs"  # Coleção para guardar os últimos IDs
-
-# Conectar ao MongoDB
-mongo_client = MongoClient(MONGO_URI)
-db = mongo_client[MONGO_DB]
-collection_move = db[MONGO_COLLECTION_MOVE]
-collection_sound = db[MONGO_COLLECTION_SOUND]
-collection_failed = db[MONGO_COLLECTION_FAILED]  # Coleção para guardar os dados que falharam a inserção
-collection_lastids = db[MONGO_COLLECTION_LASTIDS]  # Coleção para guardar os últimos IDs
+from MongoConfigs import *
 
 # Limpar todas as coleções **REMOVER DEPOIS**
 collection_move.delete_many({})
