@@ -46,8 +46,8 @@ collection_lastids.replace_one({}, {
 doc_last_ids = collection_lastids.find_one({})
 
 # Variáveis globais com os IDs
-last_move_id = doc_last_ids.get("LastIDMove", 1)
-last_sound_id = doc_last_ids.get("LastIDSound", 1)
+last_move_id = doc_last_ids.get("LastIDMove")
+last_sound_id = doc_last_ids.get("LastIDSound")
 
 
 # Função para obter o timestamp atual
