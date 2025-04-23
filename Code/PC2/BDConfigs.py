@@ -10,6 +10,15 @@ db = mariadb.connect(
 
 cursor = db.cursor()
 
+# Configuração do MySQL do professor
+db_prof = mariadb.connect(
+    host="194.210.86.10",
+    user="aluno",
+    password="aluno",
+    database="maze"
+)
+
+cursor_prof = db_prof.cursor()
 # Configuração do MQTT
 MQTT_BROKER = "broker.emqx.io"
 MQTT_PORT = 1883
