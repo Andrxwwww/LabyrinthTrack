@@ -1,6 +1,17 @@
 import statistics
 from BDConfigs import *
-import pymysql
+from datetime import datetime
+
+# Função para converter dados para o formato de failedCollection
+def convert_data_for_failedCollection(dados, report, collection):
+    return {
+        "IDMessage": dados.get("IDMove") or dados.get("IDSound"),
+        "Collection": dados.get("Collection"),
+        "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "Message": dados,
+        "Report": report,
+        "Collection": collection
+    }
 
 # Obter uma constante (config) a partir do MySQL
 def get_config(chave):
@@ -24,16 +35,15 @@ def get_config_prof(chave):
             return resultado[0]
         else:
             raise ValueError(f"[MQTT->MySQL] Configuração '{chave}' não encontrada.")
-    
-    except pymysql.connector.Error as e:
-        raise ValueError(f"Erro ao acessar a base de dados: {e}")
     except Exception as e:
         raise ValueError(f"Erro inesperado: {e}")
 
-desvio_padrao = float(get_config_prof("noisevartoleration"))
+NOISEVARTOL = float(get_config_prof("noisevartoleration"))
 LIMITE_DESVIO_PADRAO = float(get_config("limite_desvio_padrao"))
 QTD_VALS_SOUND_MAX = int(get_config("qtd_valores_sound_max"))
 QTD_VALS_SOUND_MIN = int(get_config("qtd_valores_sound_mIN"))
+LIMITE_60 = float(get_config("limite_60"))
+LIMITE_80 = float(get_config("limite_80"))
 
 # Função para validar mensagens de movimento
 # TODO: Falta o MongoToMQTT receber as mensagens que estão nesse topico
@@ -63,11 +73,15 @@ def validar_mensagem_move(doc):
 
 # Funcao para verificar se é outlier ou nao
 
-def verificar_outlier(doc , idjogo):
+def verificar_outlier(sound_value , idjogo):
 
-    sound_value = doc.get("Sound")
+    try:
+        sound_value = float(sound_value)
+    except ValueError:
+        # Se não for possível converter para float, retorna True , considerando como outlier
+        return True
 
-    limite = desvio_padrao * LIMITE_DESVIO_PADRAO  # Limite para considerar um valor como outlier
+    limite = NOISEVARTOL * LIMITE_DESVIO_PADRAO  # Limite para considerar um valor como outlier
 
     # Obter os últimos 4 valores válidos do som para o jogo
     cursor.execute("""
@@ -96,3 +110,37 @@ def verificar_outlier(doc , idjogo):
 
     media = statistics.mean(historico)
     return abs(sound_value - media) > limite
+
+def verificar_variacao_som(idjogo):
+    limite_60 = NOISEVARTOL * LIMITE_60
+    limite_80 = NOISEVARTOL * LIMITE_80
+
+    cursor.execute("""
+        SELECT Sound FROM sound 
+        WHERE IdJogo = %s 
+        ORDER BY Hour DESC 
+        LIMIT 2
+    """, (idjogo,))
+
+    resultados = cursor.fetchall()
+
+    if len(resultados) < 2:
+        print("[Mqtt -> MySQL] Não há dados suficientes para verificar variação.")
+        return
+
+    try:
+        ultimo = float(resultados[0][0])
+        penultimo = float(resultados[1][0])
+    except ValueError:
+        print("[Mqtt -> MySQL] Erro ao converter valores de som.")
+        return
+
+    variacao = abs(ultimo - penultimo)
+    print(variacao)
+
+    if variacao >= limite_80:
+        # escrever na tabela mensagens
+        print("[Mqtt -> MySQL] Variação do som a 80% do limite.")
+    elif variacao >= limite_60:
+        # escrever na tabela mensagens
+        print("[Mqtt -> MySQL] Variação do som a 60% do limite.")

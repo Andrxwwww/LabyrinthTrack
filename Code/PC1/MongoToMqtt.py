@@ -33,9 +33,6 @@ def on_message_ack(client, userdata, msg):
         else:
             print(f"[MongoDB->MQTT] Nome de coleção desconhecido: {collection_name}")
 
-            collection_failed.insert_one(convert_data_for_failedCollection(dados,"1.Colecao Desconhecida"))  # Guardar na coleção Failed
-            print(f"[MongoDB->MQTT] Documento inválido guardado em 'Failed': {dados}")
-
     except Exception as e:
         print(f"[MongoDB->MQTT] Erro ao processar ACK: {e}")
 
@@ -44,7 +41,17 @@ def on_message_failed(client, userdata, msg):
         dados = json.loads(msg.payload.decode())
         print(f"[MongoDB->MQTT] Mensagem recebida no tópico FAILED: {dados}")
 
-        collection_failed.insert_one(dados)
+
+        if dados.get("Collection") == "Sound":
+            collection_sound.update_one({"IDSound": dados.get("IDMessage") }, {"$set": {"IsMigrated": True}})
+            collection_failed.insert_one(dados)
+            #collection_sound.delete_one({"IDSound": dados.get("IDMessage")})
+        elif dados.get("Collection") == "Move":
+            collection_move.update_one({"IDMove": dados.get("IDMessage")}, {"$set": {"IsMigrated": True}})
+            collection_failed.insert_one(dados)
+            #collection_move.delete_one({"IDMove": IDMessage})
+
+        print(f"A COLECAO É: {dados.get('Collection')}")
         print(f"[MongoDB->MQTT] Documento inserido na coleção 'Failed'")
         
     except Exception as e:
@@ -52,16 +59,16 @@ def on_message_failed(client, userdata, msg):
 
 
 def on_message(client, userdata, msg):
-    if msg.topic == GROUP_MQTT_ACK_TOPIC:
-        on_message_ack(client, userdata, msg)
-    elif msg.topic == GROUP_MQTT_FAILED_TOPIC:
+    if msg.topic == GROUP_MQTT_FAILED_TOPIC:
         on_message_failed(client, userdata, msg)
+    elif msg.topic == GROUP_MQTT_ACK_TOPIC:
+        on_message_ack(client, userdata, msg)
     else:
         print(f"[MongoDB->MQTT] Mensagem recebida num tópico não tratado: {msg.topic}")
 
 client.on_message = on_message
-client.subscribe(GROUP_MQTT_ACK_TOPIC)
 client.subscribe(GROUP_MQTT_FAILED_TOPIC)
+client.subscribe(GROUP_MQTT_ACK_TOPIC)
 client.loop_start()
 
 
@@ -81,7 +88,8 @@ def publish_data(collection, mqtt_topic):
                     print(f"[MongoDB->MQTT] Publicado Move (VALIDADO): {mensagem_json}")
                     client.publish(mqtt_topic, mensagem_json)
                 else:
-                    collection_failed.insert_one(convert_data_for_failedCollection(documento,"2.[Mongo->MQTT] Movimento Invalido"))  # Guardar na coleção Failed
+                    collection_move.update_one({"IDMove": documento.get("IDMove")}, {"$set": {"IsMigrated": True}})
+                    collection_failed.insert_one(convert_data_for_failedCollection(documento,"2.[Mongo->MQTT] Movimento Invalido","Move"))  # Guardar na coleção Failed
                     print(f"[MongoDB->MQTT] Documento Move (INVÁLIDO) guardado em 'Failed': {documento}")
 
             elif mqtt_topic == GROUP_MQTT_SOUND_TOPIC:
@@ -90,7 +98,8 @@ def publish_data(collection, mqtt_topic):
                     print(f"[MongoDB->MQTT] Publicado Sound (VALIDADO): {mensagem_json}")
                     client.publish(mqtt_topic, mensagem_json)
                 else:
-                    collection_failed.insert_one(convert_data_for_failedCollection(documento,"3.[Mongo->MQTT] Som Invalido"))
+                    collection_sound.update_one({"IDSound": documento.get("IDSound")}, {"$set": {"IsMigrated": True}})
+                    collection_failed.insert_one(convert_data_for_failedCollection(documento,"3.[Mongo->MQTT] Som Invalido","Sound"))
                     print(f"[MongoDB->MQTT] Documento Sound (INVÁLIDO) guardado em 'Failed': {documento}")
 
             else:

@@ -4,6 +4,7 @@ import time
 from datetime import datetime
 
 from MongoConfigs import *
+# from Validations_PC1 import check_duplicate_msgs
 
 # Limpar todas as coleções **REMOVER DEPOIS**
 collection_move.delete_many({})
@@ -110,13 +111,13 @@ if __name__ == "__main__":
     # Iniciar threads
     mqtt_thread_move = threading.Thread(target=mqtt_subscriber, args=(MQTT_MOVE_TOPIC,), daemon=True)
     mqtt_thread_sound = threading.Thread(target=mqtt_subscriber, args=(MQTT_SOUND_TOPIC,), daemon=True)
-    #check_thread = threading.Thread(target=check_messages_received, daemon=True)  # For debugging
+    check_thread = threading.Thread(target=check_messages_received, daemon=True)  # For debugging
 
     mqtt_thread_move.start()
     mqtt_thread_sound.start()
-    #check_thread.start()
+    check_thread.start()
 
     # Esperar que as threads terminem  [ Não vão terminar por causa do loop_forever() ]
     mqtt_thread_move.join()
     mqtt_thread_sound.join()
-    #check_thread.join()
+    check_thread.join()

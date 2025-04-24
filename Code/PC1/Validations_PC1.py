@@ -1,6 +1,7 @@
 from datetime import datetime
 from contextlib import closing
 import pymysql
+from MongoConfigs import *
 
 
 # Função para buscar um campo específico de uma tabela
@@ -54,13 +55,17 @@ def verifyMovimentoValido(roomOrigin, roomDestiny):
         return False
 
 # Função para converter dados para o formato de failedCollection
-def convert_data_for_failedCollection(dados, report):
+def convert_data_for_failedCollection(dados, report, collection):
     return {
         "IDMessage": dados.get("IDMove") or dados.get("IDSound"),
+        "Collection": dados.get("Collection"),
         "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "Message": dados,
-        "Report": report
+        "Report": report,
+        "Collection": collection
     }
+
+
 
 # Função para validar o movimento
 def validar_movimento(doc):

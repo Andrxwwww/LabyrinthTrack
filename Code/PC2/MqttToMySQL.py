@@ -4,7 +4,9 @@ import json
 import threading
 
 from BDConfigs import *
-from Validations_PC2 import (validar_mensagem_move)
+from Validations_PC2 import (
+    validar_mensagem_move, verificar_outlier , convert_data_for_failedCollection, verificar_variacao_som
+)
 
 current_game = 0
 current_game_lock = threading.Lock()
@@ -13,15 +15,24 @@ current_game_lock = threading.Lock()
 def on_message_sound(client, userdata, msg):
     try:
         dados = json.loads(msg.payload.decode())
-        id_sound = dados.get("IDSound")  #
+        id_sound = dados.get("IDSound") 
         sound = dados.get("Sound")
         hour = dados.get("Hour")
         idjogo = 1  # Hardcoded
 
         createGame(idjogo)
 
-        cursor.execute("INSERT INTO sound (IDSound,Sound, IdJogo, Hour) VALUES (%s,%s, %s, %s)", (id_sound,sound, idjogo, hour))
-        db.commit()
+        if verificar_outlier( float(sound) , idjogo):
+            dados_som = json.dumps(convert_data_for_failedCollection(dados, "5. [Mqtt->MySQL] Outlier detectado", "Sound"))
+            client.publish(GROUP_MQTT_FAILED_TOPIC, dados_som)
+            print(f"[MQTT->MySQL] Mensagem inválida Sound: {dados}")
+            return
+        else:
+            verificar_variacao_som(idjogo)
+            cursor.execute("INSERT INTO sound (IDSound,Sound, IdJogo, Hour) VALUES (%s,%s, %s, %s)", (id_sound,sound, idjogo, hour))
+            db.commit()
+
+
         print(f"[MQTT->MySQL] Guardado no MySQL (SOUND): {dados}")
         ##enviar o ack para o mongo
         ack_message = json.dumps({
@@ -50,8 +61,9 @@ def on_message_medicoes(client, userdata, msg):
         # Para criar a tabela jogos
         createGame(idjogo)
         if not validar_mensagem_move(dados):
-            client.publish(GROUP_MQTT_FAILED_TOPIC, json.dumps(dados))
-            print(f"[MQTT->MySQL] Mensagem inválida: {dados}")
+            dados_move = json.dumps(convert_data_for_failedCollection(dados, "4. Mensagem inválida" , "Move"))
+            client.publish(GROUP_MQTT_FAILED_TOPIC, dados_move)
+            print(f"[MQTT->MySQL] Mensagem inválida Move: {dados}")
             return
         else:
             cursor.execute(
@@ -146,6 +158,7 @@ def start_mqtt_client(topic, on_message_callback):
     client.on_message = on_message_callback
     client.connect(MQTT_BROKER, MQTT_PORT, 60)
     client.subscribe(topic)
+    client.subscribe(GROUP_MQTT_FAILED_TOPIC)
     print(f"[MQTT->MySQL] A ouvir mensagens MQTT no tópico {topic}...")
     client.loop_forever()
 
