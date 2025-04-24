@@ -67,8 +67,8 @@ def on_message(client, userdata, msg):
         print(f"[MongoDB->MQTT] Mensagem recebida num tópico não tratado: {msg.topic}")
 
 client.on_message = on_message
-client.subscribe(GROUP_MQTT_FAILED_TOPIC)
-client.subscribe(GROUP_MQTT_ACK_TOPIC)
+client.subscribe(GROUP_MQTT_FAILED_TOPIC, qos=2)
+client.subscribe(GROUP_MQTT_ACK_TOPIC, qos=2)
 client.loop_start()
 
 

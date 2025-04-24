@@ -84,12 +84,12 @@ def on_message(client, userdata, msg):
         print("[Cloud->MongoDB] Inserido no MongoDB:", message)
 
 # Função para subscrever a um tópico MQTT
-def mqtt_subscriber(topic):
+def mqtt_subscriber(topic , num_qos):
     print(f"1. [Cloud->MongoDB] A subscrever ao tópico {topic}...")
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     client.on_message = on_message
     client.connect(MQTT_BROKER, MQTT_PORT, 60)
-    client.subscribe(topic, qos=2)
+    client.subscribe(topic, qos=num_qos)
     print(f"2. [Cloud->MongoDB] Subscrito ao tópico {topic}, aguardando mensagens...")
     client.loop_forever()
 
@@ -109,8 +109,8 @@ def check_messages_received():
 if __name__ == "__main__":
 
     # Iniciar threads
-    mqtt_thread_move = threading.Thread(target=mqtt_subscriber, args=(MQTT_MOVE_TOPIC,), daemon=True)
-    mqtt_thread_sound = threading.Thread(target=mqtt_subscriber, args=(MQTT_SOUND_TOPIC,), daemon=True)
+    mqtt_thread_move = threading.Thread(target=mqtt_subscriber, args=(MQTT_MOVE_TOPIC,2), daemon=True)
+    mqtt_thread_sound = threading.Thread(target=mqtt_subscriber, args=(MQTT_SOUND_TOPIC,1), daemon=True)
     check_thread = threading.Thread(target=check_messages_received, daemon=True)  # For debugging
 
     mqtt_thread_move.start()
