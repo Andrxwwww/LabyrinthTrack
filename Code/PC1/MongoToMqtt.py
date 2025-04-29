@@ -92,13 +92,13 @@ def publish_data(collection, mqtt_topic):
     print(f"[MongoDB->MQTT] A iniciar publicação contínua para o tópico {mqtt_topic}...")
     #Verifica se o MySql esta a enviar msg
     while True:
-        with keep_alive_lock:
-            tempo_desde_ultimo_keep_alive = datetime.now() - last_keep_alive
+        #with keep_alive_lock:
+        #    tempo_desde_ultimo_keep_alive = datetime.now() - last_keep_alive
 
-        if tempo_desde_ultimo_keep_alive > timedelta(seconds=15):
-            print(f"[MongoDB->MQTT] Sem keep alive há {tempo_desde_ultimo_keep_alive.seconds}s. Publicação pausada.")
-            time.sleep(5)
-            continue
+        #if tempo_desde_ultimo_keep_alive > timedelta(seconds=15):
+        #    print(f"[MongoDB->MQTT] Sem keep alive há {tempo_desde_ultimo_keep_alive.seconds}s. Publicação pausada.")
+        #    time.sleep(5)
+        #    continue
         documentos_encontrados = False
         for documento in collection.find({"IsMigrated": {"$ne": True}}):
             documentos_encontrados = True

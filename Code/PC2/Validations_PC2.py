@@ -1,7 +1,8 @@
 import statistics
+from decimal import Decimal
 
 from BDConfigs import *
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Função para converter dados para o formato de failedCollection
 def convert_data_for_failedCollection(dados, report, collection):
@@ -60,6 +61,28 @@ except Exception as e:
     # Decidir se o programa deve encerrar ou continuar com valores padrão
     raise  # Ou sys.exit(1)
 
+
+# Função para validar datas
+def validar_data(data):
+
+    # Verifica se a data está no formato correto
+    try:
+        datetime.strptime(data, "%Y-%m-%d %H:%M:%S.%f")
+    except ValueError:
+        print(f"[MQTT->MySQL] Data inválida: {data}.")
+        return False
+    
+    # Validação 4: Verifica se a data está atual e no intervalo correto
+    datetime_obj = datetime.strptime(data, "%Y-%m-%d %H:%M:%S.%f")
+    data_atual = datetime.now()
+    threshold = timedelta(minutes=5)
+    if datetime_obj < data_atual - threshold or datetime_obj > data_atual + threshold:
+        print(f"[MQTT->MySQL] Data fora do intervalo: {data}.")
+        return False
+
+    return True
+
+
 # Função para validar mensagens de movimento
 # TODO: Falta o MongoToMQTT receber as mensagens que estão nesse topico
 def validar_mensagem_move(doc):
@@ -73,29 +96,31 @@ def validar_mensagem_move(doc):
     origem = doc.get("RoomOrigin")
     destino = doc.get("RoomDestiny")
     status = doc.get("Status")
+    Hora = doc.get("Hora")
 
     # Validação 4: Sala origem igual ao mínimo e destino dentro do intervalo, status OK
     if (origem == sala_min or sala_min < destino <= sala_max) and status == status_ok:
         return True
+    
     # Validação 5: Origem e destino iguais ao mínimo, status é "nenhuma porta" ou "cansado"
     if (origem == sala_min or destino == sala_min) and status in [status_fail, status_cansado]:
         return True
+    
     # Validação 6: Origem e destino dentro do intervalo, status OK
     if (sala_min < origem <= sala_max or sala_min < destino <= sala_max) and status == status_ok:
         return True
+    
+    # TODO: DEPOIS TIRAR PARA DADOS MAIS RECENTES
+    # Validação 7: Verificar se a data está dentro do intervalo
+    #if not validar_data(Hora):
+    #   return False
     
     return False
 
 # Funcao para verificar se é outlier ou nao
 
 def verificar_outlier(sound_value , idjogo):
-
-    try:
-        sound_value = float(sound_value)
-    except ValueError:
-        # Se não for possível converter para float, retorna True , considerando como outlier
-        return True
-
+    
     limite = NOISEVARTOL * LIMITE_DESVIO_PADRAO  # Limite para considerar um valor como outlier
 
     # Obter os últimos 4 valores válidos do som para o jogo
@@ -144,8 +169,8 @@ def verificar_variacao_som(idjogo):
         return
 
     try:
-        ultimo = float(resultados[0][0])
-        penultimo = float(resultados[1][0])
+        ultimo = float(Decimal(resultados[0][0]))
+        penultimo = float(Decimal(resultados[1][0]))
     except ValueError:
         print("[Mqtt -> MySQL] Erro ao converter valores de som.")
         return

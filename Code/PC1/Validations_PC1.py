@@ -65,7 +65,29 @@ def convert_data_for_failedCollection(dados, report, collection):
         "Collection": collection
     }
 
+def checkDataDuplicated(data, collection):
+    try:
+        query_move = {
+            "Hora": data
+        }
+        count_move = collection_move.count_documents(query_move)
 
+        query_sound = {
+            "Hour": data
+        }
+        
+        count_sound = collection_sound.count_documents(query_sound)
+        print(f"[VALIDAÇÃO] Contagem de datas duplicadas: Move={count_move}, Sound={count_sound}")
+
+        if count_move + count_sound > 1:
+            print(f"[VALIDAÇÃO] Data duplicada encontrada: {data}")
+            return False
+        
+        return True
+    
+    except Exception as e:
+        print(f"[VALIDAÇÃO] Erro ao verificar duplicidade: {e}")
+        return True
 
 # Função para validar o movimento
 def validar_movimento(doc):
@@ -102,7 +124,12 @@ def validar_movimento(doc):
         if not verifyMovimentoValido(origem, destino):
             print(f"[VALIDAÇÃO] Movimento inválido: {origem} -> {destino}")
             return False
-
+        
+        # Validação 5: Verificar se a data é duplicada
+        if not checkDataDuplicated(hora, MONGO_COLLECTION_MOVE):
+            print(f"[VALIDAÇÃO] Data duplicada: {hora}")
+            return False
+    
         return True
 
     except Exception as e:
@@ -138,6 +165,11 @@ def validar_sound(doc):
         # Validacao 4: Verificar se o valor de Sound nao é negativo 
         if sound_value < 0:
             print(f"[VALIDAÇÃO] Valor de Sound negativo: {sound_value}")
+            return False
+        
+        # Validação 5: Verificar se a data é duplicada
+        if not checkDataDuplicated(hour, MONGO_COLLECTION_SOUND):
+            print(f"[VALIDAÇÃO] Data duplicada: {hour}")
             return False
 
         return True

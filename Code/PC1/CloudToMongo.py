@@ -110,7 +110,7 @@ if __name__ == "__main__":
 
     # Iniciar threads
     mqtt_thread_move = threading.Thread(target=mqtt_subscriber, args=(MQTT_MOVE_TOPIC,2), daemon=True)
-    mqtt_thread_sound = threading.Thread(target=mqtt_subscriber, args=(MQTT_SOUND_TOPIC,1), daemon=True)
+    mqtt_thread_sound = threading.Thread(target=mqtt_subscriber, args=(MQTT_SOUND_TOPIC,2), daemon=True)
     check_thread = threading.Thread(target=check_messages_received, daemon=True)  # For debugging
 
     mqtt_thread_move.start()

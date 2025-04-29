@@ -3,12 +3,13 @@ import paho.mqtt.client as mqtt
 import json
 import threading
 import time
+from decimal import Decimal
 
 
 ##coloar try cach
 from BDConfigs import *
 from Validations_PC2 import (
-    validar_mensagem_move, verificar_outlier , convert_data_for_failedCollection, verificar_variacao_som
+    validar_mensagem_move, verificar_outlier , convert_data_for_failedCollection, verificar_variacao_som, validar_data
 )
 
 current_game = 0
@@ -18,14 +19,16 @@ current_game_lock = threading.Lock()
 def on_message_sound(client, userdata, msg):
     try:
         dados = json.loads(msg.payload.decode())
+        print(f"[MQTT->MySQL] Mensagem recebida: {dados}")
         id_sound = dados.get("IDSound") 
-        sound = dados.get("Sound")
+        sound = float(Decimal(dados.get("Sound")))
+        print(f"SOM NUMERO: {sound}, TIPO DE VARIAVEL: {type(sound)}")
         hour = dados.get("Hour")
         idjogo = 1  # Hardcoded
 
         createGame(idjogo)
 
-        if verificar_outlier( float(sound) , idjogo):
+        if verificar_outlier(sound , idjogo): # and not validar_data(hour):
             dados_som = json.dumps(convert_data_for_failedCollection(dados, "5. [Mqtt->MySQL] Outlier detectado", "Sound"))
             client.publish(GROUP_MQTT_FAILED_TOPIC, dados_som)
             print(f"[MQTT->MySQL] Mensagem inválida Sound: {dados}")
@@ -60,6 +63,8 @@ def on_message_medicoes(client, userdata, msg):
         status = dados.get("Status")
         hour = dados.get("Hora")
         idjogo = 1  # Hardcoded
+
+        
 
         # Para criar a tabela jogos
         createGame(idjogo)
@@ -204,16 +209,16 @@ if __name__ == "__main__":
     thread_medicoes = threading.Thread(target=start_mqtt_client, args=(GROUP_MQTT_MOVE_TOPIC, on_message_medicoes))
 
     # Criar thread para o keep_alive
-    thread_keep_alive = threading.Thread(target=keep_alive_sender)
+    #thread_keep_alive = threading.Thread(target=keep_alive_sender)
 
     # Iniciar as threads
     thread_sound.start()
     thread_medicoes.start()
-    thread_keep_alive.start()
+    #thread_keep_alive.start()
 
 
 
     # Esperar as threads terminarem (caso seja necessário)
     thread_sound.join()
     thread_medicoes.join()
-    thread_keep_alive.join()
+    #thread_keep_alive.join()
