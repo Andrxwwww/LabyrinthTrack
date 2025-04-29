@@ -56,6 +56,7 @@ try:
     QTD_VALS_SOUND_MIN = int(get_config("qtd_valores_sound_mIN"))
     LIMITE_60 = float(get_config("limite_60"))
     LIMITE_80 = float(get_config("limite_80"))
+    DATETIME_THRESHOLD = float(get_config("datetime_threshold"))
 except Exception as e:
     print(f"Erro ao carregar configurações globais: {e}")
     # Decidir se o programa deve encerrar ou continuar com valores padrão
@@ -75,7 +76,7 @@ def validar_data(data):
     # Validação 4: Verifica se a data está atual e no intervalo correto
     datetime_obj = datetime.strptime(data, "%Y-%m-%d %H:%M:%S.%f")
     data_atual = datetime.now()
-    threshold = timedelta(minutes=5)
+    threshold = timedelta(minutes=DATETIME_THRESHOLD)
     if datetime_obj < data_atual - threshold or datetime_obj > data_atual + threshold:
         print(f"[MQTT->MySQL] Data fora do intervalo: {data}.")
         return False
