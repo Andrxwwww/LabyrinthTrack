@@ -2,7 +2,10 @@ from datetime import datetime
 import paho.mqtt.client as mqtt
 import json
 import threading
+import time
 
+
+##coloar try cach
 from BDConfigs import *
 from Validations_PC2 import (
     validar_mensagem_move, verificar_outlier , convert_data_for_failedCollection, verificar_variacao_som
@@ -152,6 +155,39 @@ def mazeOcupation(marsami, room_origin, room_destiny):
         db.commit()
         print("Atualizada as alterarçoes do labirinto")
 
+
+def keep_alive_sender():
+    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    client.connect(MQTT_BROKER, MQTT_PORT, 60)
+    client.loop_start()
+
+    while True:
+        try:
+            # Verificar se a conexão à base de dados está viva
+            db.ping(reconnect=False)
+
+            # Se não levantar exceção, envia mensagem de keep alive
+            keep_alive_message = json.dumps({
+                "status": "alive",
+                "timestamp": datetime.now().isoformat()
+            })
+            client.publish("keep_alive", keep_alive_message)
+            print("[MQTT->MySQL] Mensagem Keep Alive enviada.")
+
+        except mariadb.Error as e:
+            print(f"[MQTT->MySQL] Ligação à base de dados perdida: {e}")
+            time.sleep(60)  # Espera 60s se a ligação à BD falhar
+            continue
+
+        time.sleep(5)  # Espera 30 segundos
+
+    client.loop_stop()
+    client.disconnect()
+    print("[MQTT->MySQL] Keep Alive thread terminada.")
+
+
+
+
 # Função para criar um cliente MQTT numa thread
 def start_mqtt_client(topic, on_message_callback):
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
@@ -167,10 +203,17 @@ if __name__ == "__main__":
     thread_sound = threading.Thread(target=start_mqtt_client, args=(GROUP_MQTT_SOUND_TOPIC, on_message_sound))
     thread_medicoes = threading.Thread(target=start_mqtt_client, args=(GROUP_MQTT_MOVE_TOPIC, on_message_medicoes))
 
+    # Criar thread para o keep_alive
+    thread_keep_alive = threading.Thread(target=keep_alive_sender)
+
     # Iniciar as threads
     thread_sound.start()
     thread_medicoes.start()
+    thread_keep_alive.start()
+
+
 
     # Esperar as threads terminarem (caso seja necessário)
     thread_sound.join()
     thread_medicoes.join()
+    thread_keep_alive.join()

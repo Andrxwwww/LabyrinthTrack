@@ -3,8 +3,16 @@ import json
 import time
 import threading
 
+
 from MongoConfigs import *
 from Validations_PC1 import *
+
+#Keep_alive
+from datetime import datetime, timedelta
+
+last_keep_alive = datetime.now()
+keep_alive_lock = threading.Lock()
+
 
 # Cliente MQTT
 print("[MongoDB->MQTT] Conectando ao broker MQTT...")
@@ -59,6 +67,12 @@ def on_message_failed(client, userdata, msg):
 
 
 def on_message(client, userdata, msg):
+    global last_keep_alive
+
+    if msg.topic == GROUP_MQTT_Alive_TOPIC:
+        with keep_alive_lock:
+            last_keep_alive = datetime.now()
+        print("[MongoDB->MQTT] Keep Alive recebido.")
     if msg.topic == GROUP_MQTT_FAILED_TOPIC:
         on_message_failed(client, userdata, msg)
     elif msg.topic == GROUP_MQTT_ACK_TOPIC:
@@ -69,14 +83,22 @@ def on_message(client, userdata, msg):
 client.on_message = on_message
 client.subscribe(GROUP_MQTT_FAILED_TOPIC, qos=2)
 client.subscribe(GROUP_MQTT_ACK_TOPIC, qos=2)
+client.subscribe("keep_alive", qos=1)
 client.loop_start()
 
 
 # Publicar apenas documentos que ainda não foram migrados
 def publish_data(collection, mqtt_topic):
     print(f"[MongoDB->MQTT] A iniciar publicação contínua para o tópico {mqtt_topic}...")
-
+    #Verifica se o MySql esta a enviar msg
     while True:
+        with keep_alive_lock:
+            tempo_desde_ultimo_keep_alive = datetime.now() - last_keep_alive
+
+        if tempo_desde_ultimo_keep_alive > timedelta(seconds=15):
+            print(f"[MongoDB->MQTT] Sem keep alive há {tempo_desde_ultimo_keep_alive.seconds}s. Publicação pausada.")
+            time.sleep(5)
+            continue
         documentos_encontrados = False
         for documento in collection.find({"IsMigrated": {"$ne": True}}):
             documentos_encontrados = True

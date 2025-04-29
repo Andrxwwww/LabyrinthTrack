@@ -1,4 +1,8 @@
 import statistics
+import mysql
+import mysql.connector  # Import principal
+from mysql.connector import Error
+
 from BDConfigs import *
 from datetime import datetime
 
@@ -15,12 +19,20 @@ def convert_data_for_failedCollection(dados, report, collection):
 
 # Obter uma constante (config) a partir do MySQL
 def get_config(chave):
-    cursor.execute("SELECT valor FROM configs WHERE chave = %s", (chave,))
-    resultado = cursor.fetchone()
-    if resultado:
-        return resultado[0]
-    else:
-        raise ValueError(f"[MQTT->MySQL] Configuração '{chave}' não encontrada.")
+    try:
+        cursor.execute("SELECT valor FROM configs WHERE chave = %s", (chave,))
+        resultado = cursor.fetchone()
+        if resultado:
+            return resultado[0]
+        else:
+            raise ValueError(f"[MQTT->MySQL] Configuração '{chave}' não encontrada.")
+    except mariadb.ProgrammingError as e:
+        print(f"[ERRO] Tabela configs não existe ou erro de sintaxe: {e}")
+        sys.exit()
+    except mariadb.Error as e:
+        print(f"[ERRO] Falha na consulta: {e}")
+        sys.exit()
+
     
 def get_config_prof(chave):
     # Construir a consulta dinamicamente, validando a chave
@@ -38,12 +50,18 @@ def get_config_prof(chave):
     except Exception as e:
         raise ValueError(f"Erro inesperado: {e}")
 
-NOISEVARTOL = float(get_config_prof("noisevartoleration"))
-LIMITE_DESVIO_PADRAO = float(get_config("limite_desvio_padrao"))
-QTD_VALS_SOUND_MAX = int(get_config("qtd_valores_sound_max"))
-QTD_VALS_SOUND_MIN = int(get_config("qtd_valores_sound_mIN"))
-LIMITE_60 = float(get_config("limite_60"))
-LIMITE_80 = float(get_config("limite_80"))
+
+try:
+    NOISEVARTOL = float(get_config_prof("noisevartoleration"))
+    LIMITE_DESVIO_PADRAO = float(get_config("limite_desvio_padrao"))
+    QTD_VALS_SOUND_MAX = int(get_config("qtd_valores_sound_max"))
+    QTD_VALS_SOUND_MIN = int(get_config("qtd_valores_sound_mIN"))
+    LIMITE_60 = float(get_config("limite_60"))
+    LIMITE_80 = float(get_config("limite_80"))
+except Exception as e:
+    print(f"Erro ao carregar configurações globais: {e}")
+    # Decidir se o programa deve encerrar ou continuar com valores padrão
+    raise  # Ou sys.exit(1)
 
 # Função para validar mensagens de movimento
 # TODO: Falta o MongoToMQTT receber as mensagens que estão nesse topico
