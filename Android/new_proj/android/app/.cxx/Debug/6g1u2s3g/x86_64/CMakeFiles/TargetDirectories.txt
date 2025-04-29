@@ -1,2 +1,0 @@
-C:/Users/bruno/Desktop/pisidtraba/new_proj/android/app/.cxx/Debug/6g1u2s3g/x86_64/CMakeFiles/edit_cache.dir
-C:/Users/bruno/Desktop/pisidtraba/new_proj/android/app/.cxx/Debug/6g1u2s3g/x86_64/CMakeFiles/rebuild_cache.dir
