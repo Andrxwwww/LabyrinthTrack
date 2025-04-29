@@ -120,12 +120,12 @@ def validar_movimento(doc):
             print(f"[VALIDAÇÃO] Rooms inválidos: origem={origem}, destino={destino}")
             return False
         
-        # Validação 4: Verificar se o movimento é válido
+        # Validação 5: Verificar se o movimento é válido
         if not verifyMovimentoValido(origem, destino):
             print(f"[VALIDAÇÃO] Movimento inválido: {origem} -> {destino}")
             return False
         
-        # Validação 5: Verificar se a data é duplicada
+        # Validação 6: Verificar se a data é duplicada
         if not checkDataDuplicated(hora, MONGO_COLLECTION_MOVE):
             print(f"[VALIDAÇÃO] Data duplicada: {hora}")
             return False
