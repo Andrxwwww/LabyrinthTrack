@@ -1,7 +1,4 @@
 import statistics
-import mysql
-import mysql.connector  # Import principal
-from mysql.connector import Error
 
 from BDConfigs import *
 from datetime import datetime
