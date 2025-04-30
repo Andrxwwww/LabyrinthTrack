@@ -73,7 +73,7 @@ def on_message(client, userdata, msg):
         with keep_alive_lock:
             last_keep_alive = datetime.now()
         print("[MongoDB->MQTT] Keep Alive recebido.")
-    if msg.topic == GROUP_MQTT_FAILED_TOPIC:
+    elif msg.topic == GROUP_MQTT_FAILED_TOPIC:
         on_message_failed(client, userdata, msg)
     elif msg.topic == GROUP_MQTT_ACK_TOPIC:
         on_message_ack(client, userdata, msg)
@@ -83,7 +83,7 @@ def on_message(client, userdata, msg):
 client.on_message = on_message
 client.subscribe(GROUP_MQTT_FAILED_TOPIC, qos=2)
 client.subscribe(GROUP_MQTT_ACK_TOPIC, qos=2)
-client.subscribe("keep_alive", qos=1)
+client.subscribe(GROUP_MQTT_Alive_TOPIC, qos=1)
 client.loop_start()
 
 
@@ -92,15 +92,23 @@ def publish_data(collection, mqtt_topic):
     print(f"[MongoDB->MQTT] A iniciar publicação contínua para o tópico {mqtt_topic}...")
     #Verifica se o MySql esta a enviar msg
     while True:
-        #with keep_alive_lock:
-        #    tempo_desde_ultimo_keep_alive = datetime.now() - last_keep_alive
+        with keep_alive_lock:
+            tempo_desde_ultimo_keep_alive = datetime.now() - last_keep_alive
 
-        #if tempo_desde_ultimo_keep_alive > timedelta(seconds=15):
-        #    print(f"[MongoDB->MQTT] Sem keep alive há {tempo_desde_ultimo_keep_alive.seconds}s. Publicação pausada.")
-        #    time.sleep(5)
-        #    continue
+        if tempo_desde_ultimo_keep_alive > timedelta(seconds=3):
+            print(f"[MongoDB->MQTT] Sem keep alive há {tempo_desde_ultimo_keep_alive.seconds}s. Publicação pausada.")
+            print(f"Último keep-alive recebido em: {last_keep_alive}")
+            time.sleep(2)
+            continue
         documentos_encontrados = False
         for documento in collection.find({"IsMigrated": {"$ne": True}}):
+            # Se a publicação foi pausada (sem keep alive), interrompe o loop de documentos
+            with keep_alive_lock:
+                tempo_desde_ultimo_keep_alive = datetime.now() - last_keep_alive
+            if tempo_desde_ultimo_keep_alive > timedelta(seconds=3):
+                print("[MongoDB->MQTT] Sem keep alive, interrompendo publicação de documentos.")
+                break  # Sai do loop `for` e volta a verificar o keep_alive
+
             documentos_encontrados = True
             mensagem = documento.copy()
 

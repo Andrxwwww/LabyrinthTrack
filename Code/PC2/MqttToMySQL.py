@@ -169,7 +169,7 @@ def keep_alive_sender():
     while True:
         try:
             # Verificar se a conexão à base de dados está viva
-            db.ping(reconnect=False)
+            db.ping()
 
             # Se não levantar exceção, envia mensagem de keep alive
             keep_alive_message = json.dumps({
@@ -181,16 +181,37 @@ def keep_alive_sender():
 
         except mariadb.Error as e:
             print(f"[MQTT->MySQL] Ligação à base de dados perdida: {e}")
-            time.sleep(60)  # Espera 60s se a ligação à BD falhar
+            reconnect_db()
             continue
 
-        time.sleep(5)  # Espera 30 segundos
+        time.sleep(2)  # Espera 30 segundos
 
     client.loop_stop()
     client.disconnect()
     print("[MQTT->MySQL] Keep Alive thread terminada.")
 
+def reconnect_db():
+    global db, cursor
+    try:
+        db.close()  # Tenta fechar qualquer ligação antiga
+    except:
+        pass
 
+    connected = False
+    while not connected:
+        try:
+            db = mariadb.connect(
+                host="127.0.0.1",
+                user="root",
+                password="",
+                database="pisid_sql"
+            )
+            cursor = db.cursor()
+            connected = True
+            print("[MQTT->MySQL] Reconectado com sucesso ao MySQL.")
+        except mariadb.Error as e:
+            print(f"[MQTT->MySQL] Erro ao reconectar ao MySQL: {e}")
+            time.sleep(10)
 
 
 # Função para criar um cliente MQTT numa thread
@@ -209,16 +230,16 @@ if __name__ == "__main__":
     thread_medicoes = threading.Thread(target=start_mqtt_client, args=(GROUP_MQTT_MOVE_TOPIC, on_message_medicoes))
 
     # Criar thread para o keep_alive
-    #thread_keep_alive = threading.Thread(target=keep_alive_sender)
+    thread_keep_alive = threading.Thread(target=keep_alive_sender)
 
     # Iniciar as threads
     thread_sound.start()
     thread_medicoes.start()
-    #thread_keep_alive.start()
+    thread_keep_alive.start()
 
 
 
     # Esperar as threads terminarem (caso seja necessário)
     thread_sound.join()
     thread_medicoes.join()
-    #thread_keep_alive.join()
+    thread_keep_alive.join()
