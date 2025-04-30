@@ -22,7 +22,7 @@ def on_message_sound(client, userdata, msg):
         print(f"[MQTT->MySQL] Mensagem recebida: {dados}")
         id_sound = dados.get("IDSound") 
         sound = float(Decimal(dados.get("Sound")))
-        print(f"SOM NUMERO: {sound}, TIPO DE VARIAVEL: {type(sound)}")
+        #print(f"SOM NUMERO: {sound}, TIPO DE VARIAVEL: {type(sound)}")
         hour = dados.get("Hour")
         idjogo = 1  # Hardcoded
 

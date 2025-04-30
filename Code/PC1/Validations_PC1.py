@@ -77,7 +77,7 @@ def checkDataDuplicated(data, collection):
         }
         
         count_sound = collection_sound.count_documents(query_sound)
-        print(f"[VALIDAÇÃO] Contagem de datas duplicadas: Move={count_move}, Sound={count_sound}")
+        #print(f"[VALIDAÇÃO] Contagem de datas duplicadas: Move={count_move}, Sound={count_sound}")
 
         if count_move + count_sound > 1:
             print(f"[VALIDAÇÃO] Data duplicada encontrada: {data}")
