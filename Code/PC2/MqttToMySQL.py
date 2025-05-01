@@ -24,9 +24,13 @@ def on_message_sound(client, userdata, msg):
         sound = float(Decimal(dados.get("Sound")))
         #print(f"SOM NUMERO: {sound}, TIPO DE VARIAVEL: {type(sound)}")
         hour = dados.get("Hour")
-        idjogo = 1  # Hardcoded
 
-        createGame(idjogo)
+        idjogo = get_idjogo_atual()
+        if idjogo is None:
+            print("[MQTT->MySQL] Nenhum jogo com estado 'running' encontrado.")
+            return
+
+        #createGame(idjogo)
 
         if verificar_outlier(sound , idjogo): # and not validar_data(hour):
             dados_som = json.dumps(convert_data_for_failedCollection(dados, "5. [Mqtt->MySQL] Outlier detectado", "Sound"))
@@ -45,7 +49,7 @@ def on_message_sound(client, userdata, msg):
             "IDMongo": id_sound,
             "collection": "Sound"  # identifica a coleção certa
         })
-        client.publish(GROUP_MQTT_ACK_TOPIC, ack_message)
+        client.publish(GROUP_MQTT_ACK_TOPIC, ack_message,qos=2) #para garantir que entrega
         print(f"[MQTT->MySQL] Enviado ACK para {id_sound}")
 
     except Exception as e:
@@ -62,12 +66,16 @@ def on_message_medicoes(client, userdata, msg):
         room_destiny = dados.get("RoomDestiny")
         status = dados.get("Status")
         hour = dados.get("Hora")
-        idjogo = 1  # Hardcoded
+
+        idjogo = get_idjogo_atual()
+        if idjogo is None:
+            print("[MQTT->MySQL] Nenhum jogo com estado 'running' encontrado.")
+            return
 
         
 
         # Para criar a tabela jogos
-        createGame(idjogo)
+        #createGame(idjogo)
         if not validar_mensagem_move(dados):
             dados_move = json.dumps(convert_data_for_failedCollection(dados, "4. Mensagem inválida" , "Move"))
             client.publish(GROUP_MQTT_FAILED_TOPIC, dados_move)
@@ -86,7 +94,7 @@ def on_message_medicoes(client, userdata, msg):
             "IDMongo": id_move,
             "collection": "Move"  # ou "sound", conforme a coleção certa
         })
-        client.publish(GROUP_MQTT_ACK_TOPIC, ack_message)
+        client.publish(GROUP_MQTT_ACK_TOPIC, ack_message,qos=2)
 
         #mazeOcupation(marsami, room_origin, room_destiny)
 
@@ -111,7 +119,10 @@ def createGame(idjogo):
 def mazeOcupation(marsami, room_origin, room_destiny):
     global current_game
 
-    idjogo = 1  # Hardcoded
+    idjogo = get_idjogo_atual()
+    if idjogo is None:
+        print("[MQTT->MySQL] Nenhum jogo com estado 'running' encontrado.")
+        return
 
     with current_game_lock:
         if room_origin == 0 and room_destiny == 0:
@@ -159,6 +170,18 @@ def mazeOcupation(marsami, room_origin, room_destiny):
         # Confirma a alteração na base de dados
         db.commit()
         print("Atualizada as alterarçoes do labirinto")
+
+def get_idjogo_atual():
+    try:
+        cursor.execute("SELECT IDJogo FROM jogo WHERE Estado = 'running' ORDER BY IDJogo DESC LIMIT 1")
+        result = cursor.fetchone()
+        if result:
+            return result[0]
+        else:
+            return None  # Ou lança exceção, dependendo do comportamento desejado
+    except Exception as e:
+        print(f"[MQTT->MySQL] Erro ao obter IDJogo atual: {e}")
+        return None
 
 
 def keep_alive_sender():
