@@ -14,6 +14,7 @@ def main():
     parser.add_argument("--broker", default="broker.emqx.io", help="Endereço do broker MQTT")
     parser.add_argument("--port", type=int, default=1883, help="Porta do broker MQTT")
     parser.add_argument("--topic", default="pisid_mazeact", help="Tópico MQTT")
+    parser.add_argument("--room", type=int, help="Sala única (opcional)")
 
     args = parser.parse_args()
 
@@ -23,6 +24,8 @@ def main():
         mensagem += f", RoomOrigin: {args.room_origin}"
     if args.room_destiny is not None:
         mensagem += f", RoomDestiny: {args.room_destiny}"
+    if args.room is not None:
+        mensagem += f", Room: {args.room}"
     mensagem += "}"
 
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
@@ -62,5 +65,8 @@ if __name__ == "__main__":
 4. Para definir broker, porta ou tópico diferentes:
 
    python mqtt_sender.py --type CloseDoor --room_origin 1 --room_destiny 3 --broker test.mosquitto.org --port 1883 --topic maze/teste
+
+5. Enviar o Score:  
+   python mqtt_sender.py --type Score --room 2
 
 """
