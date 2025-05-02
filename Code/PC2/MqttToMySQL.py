@@ -12,12 +12,129 @@ MySQLToMySQL.main()
 
 ##coloar try cach
 from BDConfigs import *
-from Validations_PC2 import (
-    validar_mensagem_move, verificar_outlier , convert_data_for_failedCollection, verificar_variacao_som, validar_data
-)
+from BDdata_PC2 import *
 
 current_game = 0
-current_game_lock = threading.Lock()
+
+# Função para validar datas
+def validar_data(data):
+
+    # Verifica se a data está no formato correto
+    try:
+        datetime.strptime(data, "%Y-%m-%d %H:%M:%S.%f")
+    except ValueError:
+        print(f"[MQTT->MySQL] Data inválida: {data}.")
+        return False
+    
+    # Validação 4: Verifica se a data está atual e no intervalo correto
+    datetime_obj = datetime.strptime(data, "%Y-%m-%d %H:%M:%S.%f")
+    data_atual = datetime.now()
+    threshold = timedelta(minutes=DATETIME_THRESHOLD)
+    if datetime_obj < data_atual - threshold or datetime_obj > data_atual + threshold:
+        print(f"[MQTT->MySQL] Data fora do intervalo: {data}.")
+        return False
+
+    return True
+
+
+# Função para validar mensagens de movimento
+# TODO: Falta o MongoToMQTT receber as mensagens que estão nesse topico
+def validar_mensagem_move(doc):
+
+    origem = doc.get("RoomOrigin")
+    destino = doc.get("RoomDestiny")
+    status = doc.get("Status")
+    Hora = doc.get("Hora")
+
+    # Validação 4: Sala origem igual ao mínimo e destino dentro do intervalo, status OK
+    if (origem == sala_min or sala_min < destino <= sala_max) and status == status_ok:
+        return True
+    
+    # Validação 5: Origem e destino iguais ao mínimo, status é "nenhuma porta" ou "cansado"
+    if (origem == sala_min or destino == sala_min) and status in [status_fail, status_cansado]:
+        return True
+    
+    # Validação 6: Origem e destino dentro do intervalo, status OK
+    if (sala_min < origem <= sala_max or sala_min < destino <= sala_max) and status == status_ok:
+        return True
+    
+    # TODO: DEPOIS TIRAR PARA DADOS MAIS RECENTES
+    # Validação 7: Verificar se a data está dentro do intervalo
+    #if not validar_data(Hora):
+    #   return False
+    
+    return False
+
+
+
+# Funcao para verificar se é outlier ou nao
+def verificar_outlier(sound_value , idjogo):
+    
+    limite = NOISEVARTOL * LIMITE_DESVIO_PADRAO  # Limite para considerar um valor como outlier
+
+    # Obter os últimos 4 valores válidos do som para o jogo
+    cursor.execute("""
+        SELECT Sound FROM sound 
+        WHERE IdJogo = %s 
+        ORDER BY Hour DESC 
+        LIMIT 20
+    """, (idjogo,))
+
+    resultados = cursor.fetchall()
+    historico = []
+
+    for row in resultados:
+        valor = float(row[0])
+        if len(historico) >= QTD_VALS_SOUND_MAX:
+            break
+        if len(historico) >= QTD_VALS_SOUND_MIN:
+            media = statistics.mean(historico)
+            if abs(valor - media) > limite:
+                continue  # Ignora valores que seriam outliers
+        historico.append(valor)
+
+    if len(historico) < QTD_VALS_SOUND_MIN:
+        # Se só temos 1 ou nenhum valor válido, não é possível comparar com confiança
+        return False
+
+    media = statistics.mean(historico)
+    return abs(sound_value - media) > limite
+
+def verificar_variacao_som(idjogo):
+    limite_60 = NOISEVARTOL * LIMITE_60
+    limite_80 = NOISEVARTOL * LIMITE_80
+
+    try:
+        cursor.execute("""
+            SELECT Sound FROM sound 
+            WHERE IdJogo = %s 
+            ORDER BY Hour DESC 
+            LIMIT 2
+        """, (idjogo,))
+        resultados = cursor.fetchall()
+    except mariadb.Error as e:
+        print(f"[ERRO] Erro ao aceder à base de dados: {e}")
+        return
+
+    if len(resultados) < 2:
+        print("[Mqtt -> MySQL] Não há dados suficientes para verificar variação.")
+        return
+
+    try:
+        ultimo = float(Decimal(resultados[0][0]))
+        penultimo = float(Decimal(resultados[1][0]))
+    except (ValueError, TypeError, InvalidOperation) as e:
+        print(f"[Mqtt -> MySQL] Erro ao converter valores de som: {e}")
+        return
+
+    variacao = abs(ultimo - penultimo)
+    print(variacao)
+
+    if variacao >= limite_80:
+        print("[Mqtt -> MySQL] Variação do som a 80% do limite.")
+    elif variacao >= limite_60:
+        print("[Mqtt -> MySQL] Variação do som a 60% do limite.")
+
 
 # Callback para mensagens de SOUND
 def on_message_sound(client, userdata, msg):
@@ -33,34 +150,35 @@ def on_message_sound(client, userdata, msg):
         if idjogo is None:
             print("[MQTT->MySQL] Nenhum jogo com estado 'running' encontrado.")
             idjogo=1
-
+        
         if verificar_outlier(sound , idjogo):
             dados_som = json.dumps(convert_data_for_failedCollection(dados, "5. [Mqtt->MySQL] Outlier detectado", "Sound"))
             client.publish(GROUP_MQTT_FAILED_TOPIC, dados_som)
             print(f"[MQTT->MySQL] Mensagem inválida Sound: {dados}")
         else:
             verificar_variacao_som(idjogo)
-            try:
-                cursor.execute(
-                    "INSERT INTO sound (IDSound, Sound, IdJogo, Hour) VALUES (%s, %s, %s, %s)",
-                    (id_sound, sound, idjogo, hour)
-                )
-                db.commit()
-                print(f"[MQTT->MySQL] Guardado no MySQL (SOUND): {dados}")
-            except Exception as insert_err:
-                if "Duplicate entry" in str(insert_err):
-                    print(f"[MQTT->MySQL] Som duplicado, já existente no MySQL: {id_sound}")
-                else:
-                    print(f"[MQTT->MySQL] Erro ao inserir no MySQL: {insert_err}")
-                    return  # só não envia ACK se o erro for inesperado
+            with db_lock:
+                try:
+                    cursor.execute(
+                        "INSERT INTO sound (IDSound, Sound, IdJogo, Hour) VALUES (%s, %s, %s, %s)",
+                        (id_sound, sound, idjogo, hour)
+                    )
+                    db.commit()
+                    print(f"[MQTT->MySQL] Guardado no MySQL (SOUND): {dados}")
+                except Exception as insert_err:
+                    if "Duplicate entry" in str(insert_err):
+                        print(f"[MQTT->MySQL] Som duplicado, já existente no MySQL: {id_sound}")
+                    else:
+                        print(f"[MQTT->MySQL] Erro ao inserir no MySQL: {insert_err}")
+                        return  # só não envia ACK se o erro for inesperado
 
-        # Enviar sempre o ACK
-        ack_message = json.dumps({
-            "IDMongo": id_sound,
-            "collection": "Sound"
-        })
-        client.publish(GROUP_MQTT_ACK_TOPIC, ack_message, qos=2)
-        print(f"[MQTT->MySQL] Enviado ACK para {id_sound}")
+            # Enviar sempre o ACK
+            ack_message = json.dumps({
+                "IDMongo": id_sound,
+                "collection": "Sound"
+            })
+            client.publish(GROUP_MQTT_ACK_TOPIC, ack_message, qos=2)
+            print(f"[MQTT->MySQL] Enviado ACK para {id_sound}")
 
     except Exception as e:
         print(f"[MQTT->MySQL] Erro ao processar mensagem SOUND: {e}")
@@ -87,19 +205,20 @@ def on_message_medicoes(client, userdata, msg):
             print(f"[MQTT->MySQL] Mensagem inválida Move: {dados}")
             return
         else:
-            try:
-                cursor.execute(
-                    "INSERT INTO medicoespassagens (IDMedicao, Hora, SalaOrigem, SalaDestino, Marsami, Status, IDJogo) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-                    (id_move, hour, room_origin, room_destiny, marsami, status, idjogo)
-                )
-                db.commit()
-                print(f"[MQTT->MySQL] Guardado no MySQL (MEDIÇÕES): {dados}")
-            except Exception as insert_err:
-                if "Duplicate entry" in str(insert_err):
-                    print(f"[MQTT->MySQL] Medição duplicada, já existente no MySQL: {id_move}")
-                else:
-                    print(f"[MQTT->MySQL] Erro ao inserir no MySQL: {insert_err}")
-                    return  # neste caso, não envia ACK porque foi erro inesperado
+            with db_lock:
+                try:
+                    cursor.execute(
+                        "INSERT INTO medicoespassagens (IDMedicao, Hora, SalaOrigem, SalaDestino, Marsami, Status, IDJogo) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                        (id_move, hour, room_origin, room_destiny, marsami, status, idjogo)
+                    )
+                    db.commit()
+                    print(f"[MQTT->MySQL] Guardado no MySQL (MEDIÇÕES): {dados}")
+                except Exception as insert_err:
+                    if "Duplicate entry" in str(insert_err):
+                        print(f"[MQTT->MySQL] Medição duplicada, já existente no MySQL: {id_move}")
+                    else:
+                        print(f"[MQTT->MySQL] Erro ao inserir no MySQL: {insert_err}")
+                        return  # neste caso, não envia ACK porque foi erro inesperado
 
         # Envia sempre o ACK, mesmo que duplicado
         ack_message = json.dumps({
@@ -111,6 +230,9 @@ def on_message_medicoes(client, userdata, msg):
 
     except Exception as e:
         print(f"[MQTT->MySQL] Erro ao processar mensagem MEDIÇÕES: {e}")
+
+
+current_game_lock = threading.Lock()
 
 def createGame(idjogo):
     global current_game
@@ -124,73 +246,23 @@ def createGame(idjogo):
             db.commit()
             print(f"[MQTT->MySQL] Guardado no MySQL (Jogo): {idjogo}")
 
-## if tabela n exite cria else dá update
-def mazeOcupation(marsami, room_origin, room_destiny):
-    global current_game
 
-    idjogo = get_idjogo_atual()
-    if idjogo is None:
-        print("[MQTT->MySQL] Nenhum jogo com estado 'running' encontrado.")
-        return
 
-    with current_game_lock:
-        if room_origin == 0 and room_destiny == 0:
-            # Se origem e destino forem 0, o marsami está preso e não há atualização necessária
-            return
-
-        # Verifica se já existe um registo para esta sala e jogo
-        cursor.execute("SELECT NumeroMarsamisOdd, NumeroMarsamisEven FROM ocupacaolabirinto WHERE IDJogo = %s AND Sala = %s",
-                       (idjogo, room_destiny))
-        result_destiny = cursor.fetchone()
-
-        if result_destiny is None:
-            # Se não existir, insere um novo registo na sala de destino
-            if marsami % 2:
-                cursor.execute("INSERT INTO ocupacaolabirinto (IDJogo, NumeroMarsamisOdd, Sala) VALUES (%s, %s, %s)",
-                               (idjogo, 1, room_destiny))
-            else:
-                cursor.execute("INSERT INTO ocupacaolabirinto (IDJogo, NumeroMarsamisEven, Sala) VALUES (%s, %s, %s)",
-                               (idjogo, 1, room_destiny))
-        else:
-            # Se já existir, atualiza os valores na sala de destino
-            if marsami % 2:
-                cursor.execute("UPDATE ocupacaolabirinto SET NumeroMarsamisOdd = NumeroMarsamisOdd + 1 WHERE IDJogo = %s AND Sala = %s",
-                               (idjogo, room_destiny))
-            else:
-                cursor.execute("UPDATE ocupacaolabirinto SET NumeroMarsamisEven = NumeroMarsamisEven + 1 WHERE IDJogo = %s AND Sala = %s",
-                               (idjogo, room_destiny))
-
-        # Se a sala de origem não for 0, decrementa o contador da sala de origem
-        if room_origin != 0:
-            cursor.execute("SELECT NumeroMarsamisOdd, NumeroMarsamisEven FROM ocupacaolabirinto WHERE IDJogo = %s AND Sala = %s",
-                           (idjogo, room_origin))
-            result_origin = cursor.fetchone()
-
-            if result_origin:
-                if marsami % 2:
-                    cursor.execute(
-                        "UPDATE ocupacaolabirinto SET NumeroMarsamisOdd = NumeroMarsamisOdd - 1 WHERE IDJogo = %s AND Sala = %s",
-                        (idjogo, room_origin))
-                else:
-                    cursor.execute(
-                        "UPDATE ocupacaolabirinto SET NumeroMarsamisEven = NumeroMarsamisEven - 1 WHERE IDJogo = %s AND Sala = %s",
-                        (idjogo, room_origin))
-
-        # Confirma a alteração na base de dados
-        db.commit()
-        print("Atualizada as alterarçoes do labirinto")
+# New lock specifically for database operations
+db_lock = threading.Lock()
 
 def get_idjogo_atual():
-    try:
-        cursor.execute("SELECT IDJogo FROM jogo WHERE Estado = 'running' ORDER BY IDJogo DESC LIMIT 1")
-        result = cursor.fetchone()
-        if result:
-            return result[0]
-        else:
-            return None  # Ou lança exceção, dependendo do comportamento desejado
-    except Exception as e:
-        print(f"[MQTT->MySQL] Erro ao obter IDJogo atual: {e}")
-        return None
+    with db_lock:
+        try:
+            cursor.execute("SELECT IDJogo FROM jogo WHERE Estado = 'running' ORDER BY IDJogo DESC LIMIT 1")
+            result = cursor.fetchone()
+            if result:
+                return result[0]
+            else:
+                return None  # Ou lança exceção, dependendo do comportamento desejado
+        except Exception as e:
+            print(f"[MQTT->MySQL] Erro ao obter IDJogo atual: {e}")
+            return None
 
 
 def keep_alive_sender():
