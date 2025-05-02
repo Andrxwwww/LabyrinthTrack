@@ -6,6 +6,10 @@ import time
 from decimal import Decimal
 
 
+#Coloca os valores inicias na tabela(corridor) e (setupmaze)
+import MySQLToMySQL
+MySQLToMySQL.main()
+
 ##coloar try cach
 from BDConfigs import *
 from Validations_PC2 import (
@@ -249,6 +253,7 @@ def start_mqtt_client(topic, on_message_callback):
 
 if __name__ == "__main__":
     # Criar duas threads para os dois tópicos
+
     thread_sound = threading.Thread(target=start_mqtt_client, args=(GROUP_MQTT_SOUND_TOPIC, on_message_sound))
     thread_medicoes = threading.Thread(target=start_mqtt_client, args=(GROUP_MQTT_MOVE_TOPIC, on_message_medicoes))
 

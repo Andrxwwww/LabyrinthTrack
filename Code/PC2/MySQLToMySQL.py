@@ -1,3 +1,4 @@
+from datetime import datetime
 import pymysql
 import mariadb
 from contextlib import closing
@@ -33,7 +34,7 @@ def insert_data_to_local(table, data):
             host="127.0.0.1",
             user="root",
             password="",
-            database="pisis"
+            database="pisid_sql"
         )
         cursor = conn.cursor()
 
@@ -46,25 +47,32 @@ def insert_data_to_local(table, data):
             values = [(row['Rooma'], row['Roomb'], row['Distance'], row['ID']) for row in data]
         elif table == "SetupMaze":
             insert_query = """
-            INSERT INTO SetupMaze (normalnoise, numberrooms, numbermarsamis, numberplayers, frozentime, delaytime, timemarsamilive, noisevartoleration, step, minutesstep)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ON DUPLICATE KEY UPDATE 
-                normalnoise = VALUES(normalnoise),
-                numberrooms = VALUES(numberrooms),
-                numbermarsamis = VALUES(numbermarsamis),
-                numberplayers = VALUES(numberplayers),
-                frozentime = VALUES(frozentime),
-                delaytime = VALUES(delaytime),
-                timemarsamilive = VALUES(timemarsamilive),
-                noisevartoleration = VALUES(noisevartoleration),
-                step = VALUES(step),
-                minutesstep = VALUES(minutesstep)
-            """
+                           INSERT INTO SetupMaze (normalnoise, \
+                                                  numberrooms, \
+                                                  numbermarsamis, \
+                                                  numberplayers, \
+                                                  noisevartoleration, \
+                                                  ID, \
+                                                  last_updated -- Novo campo
+                           ) \
+                           VALUES (%s, %s, %s, %s, %s, %s, %s) ON DUPLICATE KEY \
+                           UPDATE \
+                               normalnoise = \
+                           VALUES (normalnoise), numberrooms = \
+                           VALUES (numberrooms), numbermarsamis = \
+                           VALUES (numbermarsamis), numberplayers = \
+                           VALUES (numberplayers), noisevartoleration = \
+                           VALUES (noisevartoleration), last_updated = CURRENT_TIMESTAMP -- Sempre atualiza o timestamp \
+                           """
             values = [
                 (
-                    row['normalnoise'], row['numberrooms'], row['numbermarsamis'], row['numberplayers'],
-                    row['frozentime'], row['delaytime'], row['timemarsamilive'], row['noisevartoleration'],
-                    row['step'], row.get('minutesstep')
+                    row['normalnoise'],
+                    row['numberrooms'],
+                    row['numbermarsamis'],
+                    row['numberplayers'],
+                    row['noisevartoleration'],
+                    row['ID'],
+                    datetime.now()  # Valor inicial (pode ser qualquer valor, pois será sobrescrito)
                 )
                 for row in data
             ]
@@ -81,6 +89,10 @@ def insert_data_to_local(table, data):
 
 
 # Sincronização das tabelas
-for table in ["Corridor", "SetupMaze"]:
-    data = fetch_data_from_cloud(table)
-    insert_data_to_local(table, data)
+def main():
+    for table in ["Corridor", "SetupMaze"]:
+        data = fetch_data_from_cloud(table)
+        insert_data_to_local(table, data)
+
+if __name__ == "__main__":
+    main()  # Executa apenas quando o script é chamado diretamente

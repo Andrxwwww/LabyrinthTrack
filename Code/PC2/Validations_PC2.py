@@ -46,7 +46,8 @@ def get_config_prof(chave):
         else:
             raise ValueError(f"[MQTT->MySQL] Configuração '{chave}' não encontrada.")
     except Exception as e:
-        raise ValueError(f"Erro inesperado: {e}")
+        print(f"[ERRO] Falha na conexão com o banco local: {e}")
+        sys.exit(1)
 
 
 try:
