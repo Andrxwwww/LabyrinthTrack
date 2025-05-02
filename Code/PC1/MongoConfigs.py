@@ -1,3 +1,4 @@
+import sys
 from pymongo import MongoClient
 
 # --- Configurações MQTT ---
@@ -24,8 +25,12 @@ MONGO_COLLECTION_FAILED = "Failed"
 MONGO_COLLECTION_LASTIDS = "LastIDs"
 
 # --- Conexão Mongo ---
-mongo_client = MongoClient(MONGO_URI)
-db = mongo_client[MONGO_DB]
+try:
+    mongo_client = MongoClient(MONGO_URI)
+    db = mongo_client[MONGO_DB]
+except Exception as e:
+    print(f"[ERRO] Falha na conexão com o MongoDB , por favor tente novamente: {e}")
+    sys.exit(1)
 
 # --- Coleções Mongo ---
 collection_move = db[MONGO_COLLECTION_MOVE]
