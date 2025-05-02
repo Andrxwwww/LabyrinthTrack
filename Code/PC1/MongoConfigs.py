@@ -26,11 +26,13 @@ MONGO_COLLECTION_LASTIDS = "LastIDs"
 
 # --- Conexão Mongo ---
 try:
-    mongo_client = MongoClient(MONGO_URI)
+    mongo_client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=3000)  # timeout de 3 segundos
+    mongo_client.admin.command('ping')  # força a conexão ao servidor
     db = mongo_client[MONGO_DB]
 except Exception as e:
     print(f"[ERRO] Falha na conexão com o MongoDB , por favor tente novamente: {e}")
     sys.exit(1)
+
 
 # --- Coleções Mongo ---
 collection_move = db[MONGO_COLLECTION_MOVE]
