@@ -1,5 +1,5 @@
 import statistics
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from BDConfigs import *
 from datetime import datetime, timedelta
@@ -61,8 +61,14 @@ try:
     DATETIME_THRESHOLD = float(get_config("datetime_threshold"))
 except Exception as e:
     print(f"Erro ao carregar configurações globais: {e}")
-    # Decidir se o programa deve encerrar ou continuar com valores padrão
-    raise  # todo Ou sys.exit(1)
+    print("[AVISO] A usar valores padrão de emergência.")
+    NOISEVARTOL = 19
+    LIMITE_DESVIO_PADRAO = 3.0
+    QTD_VALS_SOUND_MAX = 4
+    QTD_VALS_SOUND_MIN = 2
+    LIMITE_60 = 0.6
+    LIMITE_80 = 0.8
+    DATETIME_THRESHOLD = 5
 
 
 # Função para validar datas
@@ -158,14 +164,17 @@ def verificar_variacao_som(idjogo):
     limite_60 = NOISEVARTOL * LIMITE_60
     limite_80 = NOISEVARTOL * LIMITE_80
 
-    cursor.execute("""
-        SELECT Sound FROM sound 
-        WHERE IdJogo = %s 
-        ORDER BY Hour DESC 
-        LIMIT 2
-    """, (idjogo,))
-
-    resultados = cursor.fetchall()
+    try:
+        cursor.execute("""
+            SELECT Sound FROM sound 
+            WHERE IdJogo = %s 
+            ORDER BY Hour DESC 
+            LIMIT 2
+        """, (idjogo,))
+        resultados = cursor.fetchall()
+    except mariadb.Error as e:
+        print(f"[ERRO] Erro ao aceder à base de dados: {e}")
+        return
 
     if len(resultados) < 2:
         print("[Mqtt -> MySQL] Não há dados suficientes para verificar variação.")
@@ -174,16 +183,14 @@ def verificar_variacao_som(idjogo):
     try:
         ultimo = float(Decimal(resultados[0][0]))
         penultimo = float(Decimal(resultados[1][0]))
-    except ValueError:
-        print("[Mqtt -> MySQL] Erro ao converter valores de som.")
+    except (ValueError, TypeError, InvalidOperation) as e:
+        print(f"[Mqtt -> MySQL] Erro ao converter valores de som: {e}")
         return
 
     variacao = abs(ultimo - penultimo)
     print(variacao)
 
     if variacao >= limite_80:
-        # escrever na tabela mensagens
         print("[Mqtt -> MySQL] Variação do som a 80% do limite.")
     elif variacao >= limite_60:
-        # escrever na tabela mensagens
         print("[Mqtt -> MySQL] Variação do som a 60% do limite.")

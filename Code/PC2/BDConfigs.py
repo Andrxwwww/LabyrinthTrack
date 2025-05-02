@@ -18,6 +18,7 @@ try:
     cursor = db.cursor()
     print("[SUCESSO] Conectado ao banco de dados local.")
 
+
 except mariadb.Error as e:
     print(f"[ERRO] Falha na conexão com o banco local: {e}")
     sys.exit(1)  # Encerra o programa se a conexão crítica falhar

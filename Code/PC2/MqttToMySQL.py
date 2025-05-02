@@ -22,6 +22,7 @@ current_game_lock = threading.Lock()
 # Callback para mensagens de SOUND
 def on_message_sound(client, userdata, msg):
     try:
+
         dados = json.loads(msg.payload.decode())
         print(f"[MQTT->MySQL] Mensagem recebida: {dados}")
         id_sound = dados.get("IDSound")
@@ -31,7 +32,7 @@ def on_message_sound(client, userdata, msg):
         idjogo = get_idjogo_atual()
         if idjogo is None:
             print("[MQTT->MySQL] Nenhum jogo com estado 'running' encontrado.")
-            return
+            idjogo=1
 
         if verificar_outlier(sound , idjogo):
             dados_som = json.dumps(convert_data_for_failedCollection(dados, "5. [Mqtt->MySQL] Outlier detectado", "Sound"))
@@ -269,7 +270,11 @@ if __name__ == "__main__":
     thread_medicoes.start()
     thread_keep_alive.start()
 
-
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("\n[MQTT->MySQL] Interrompido pelo utilizador.")
 
     # Esperar as threads terminarem (caso seja necessário)
     thread_sound.join()
