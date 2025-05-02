@@ -31,6 +31,7 @@ def get_config(chave):
         print(f"[ERRO] Falha na consulta: {e}")
         sys.exit()
 
+
     
 def get_config_prof(chave):
     # Construir a consulta dinamicamente, validando a chave
@@ -48,7 +49,7 @@ def get_config_prof(chave):
     except Exception as e:
         print(f"[ERRO] Falha na conexão com o banco local: {e}")
         sys.exit(1)
-
+        #todo decidir se se coloca valores padrão
 
 try:
     NOISEVARTOL = float(get_config_prof("noisevartoleration"))
@@ -61,7 +62,7 @@ try:
 except Exception as e:
     print(f"Erro ao carregar configurações globais: {e}")
     # Decidir se o programa deve encerrar ou continuar com valores padrão
-    raise  # Ou sys.exit(1)
+    raise  # todo Ou sys.exit(1)
 
 
 # Função para validar datas

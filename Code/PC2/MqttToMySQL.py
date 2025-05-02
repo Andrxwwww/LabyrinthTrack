@@ -24,9 +24,8 @@ def on_message_sound(client, userdata, msg):
     try:
         dados = json.loads(msg.payload.decode())
         print(f"[MQTT->MySQL] Mensagem recebida: {dados}")
-        id_sound = dados.get("IDSound") 
+        id_sound = dados.get("IDSound")
         sound = float(Decimal(dados.get("Sound")))
-        #print(f"SOM NUMERO: {sound}, TIPO DE VARIAVEL: {type(sound)}")
         hour = dados.get("Hour")
 
         idjogo = get_idjogo_atual()
@@ -34,26 +33,32 @@ def on_message_sound(client, userdata, msg):
             print("[MQTT->MySQL] Nenhum jogo com estado 'running' encontrado.")
             return
 
-        #createGame(idjogo)
-
-        if verificar_outlier(sound , idjogo): # and not validar_data(hour):
+        if verificar_outlier(sound , idjogo):
             dados_som = json.dumps(convert_data_for_failedCollection(dados, "5. [Mqtt->MySQL] Outlier detectado", "Sound"))
             client.publish(GROUP_MQTT_FAILED_TOPIC, dados_som)
             print(f"[MQTT->MySQL] Mensagem inválida Sound: {dados}")
-            return
         else:
             verificar_variacao_som(idjogo)
-            cursor.execute("INSERT INTO sound (IDSound,Sound, IdJogo, Hour) VALUES (%s,%s, %s, %s)", (id_sound,sound, idjogo, hour))
-            db.commit()
+            try:
+                cursor.execute(
+                    "INSERT INTO sound (IDSound, Sound, IdJogo, Hour) VALUES (%s, %s, %s, %s)",
+                    (id_sound, sound, idjogo, hour)
+                )
+                db.commit()
+                print(f"[MQTT->MySQL] Guardado no MySQL (SOUND): {dados}")
+            except Exception as insert_err:
+                if "Duplicate entry" in str(insert_err):
+                    print(f"[MQTT->MySQL] Som duplicado, já existente no MySQL: {id_sound}")
+                else:
+                    print(f"[MQTT->MySQL] Erro ao inserir no MySQL: {insert_err}")
+                    return  # só não envia ACK se o erro for inesperado
 
-
-        print(f"[MQTT->MySQL] Guardado no MySQL (SOUND): {dados}")
-        ##enviar o ack para o mongo
+        # Enviar sempre o ACK
         ack_message = json.dumps({
             "IDMongo": id_sound,
-            "collection": "Sound"  # identifica a coleção certa
+            "collection": "Sound"
         })
-        client.publish(GROUP_MQTT_ACK_TOPIC, ack_message,qos=2) #para garantir que entrega
+        client.publish(GROUP_MQTT_ACK_TOPIC, ack_message, qos=2)
         print(f"[MQTT->MySQL] Enviado ACK para {id_sound}")
 
     except Exception as e:
@@ -62,9 +67,8 @@ def on_message_sound(client, userdata, msg):
 # Callback para mensagens de MEDIÇÕES
 def on_message_medicoes(client, userdata, msg):
     try:
-
         dados = json.loads(msg.payload.decode())
-        id_move = dados.get("IDMove") ## este nome foi só para testes
+        id_move = dados.get("IDMove")
         marsami = dados.get("Marsami")
         room_origin = dados.get("RoomOrigin")
         room_destiny = dados.get("RoomDestiny")
@@ -76,32 +80,32 @@ def on_message_medicoes(client, userdata, msg):
             print("[MQTT->MySQL] Nenhum jogo com estado 'running' encontrado.")
             return
 
-        
-
-        # Para criar a tabela jogos
-        #createGame(idjogo)
         if not validar_mensagem_move(dados):
-            dados_move = json.dumps(convert_data_for_failedCollection(dados, "4. Mensagem inválida" , "Move"))
+            dados_move = json.dumps(convert_data_for_failedCollection(dados, "4. Mensagem inválida", "Move"))
             client.publish(GROUP_MQTT_FAILED_TOPIC, dados_move)
             print(f"[MQTT->MySQL] Mensagem inválida Move: {dados}")
             return
         else:
-            cursor.execute(
-                "INSERT INTO medicoespassagens (IDMedicao,Hora,SalaOrigem,SalaDestino, Marsami,Status,IDJogo) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-                (id_move, hour ,room_origin, room_destiny,marsami,status,idjogo)
-            )
-            db.commit()
-            print(f"[MQTT->MySQL] Guardado no MySQL (MEDIÇÕES): {dados}")
-        
-        #enviar o ack para o mongo
+            try:
+                cursor.execute(
+                    "INSERT INTO medicoespassagens (IDMedicao, Hora, SalaOrigem, SalaDestino, Marsami, Status, IDJogo) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                    (id_move, hour, room_origin, room_destiny, marsami, status, idjogo)
+                )
+                db.commit()
+                print(f"[MQTT->MySQL] Guardado no MySQL (MEDIÇÕES): {dados}")
+            except Exception as insert_err:
+                if "Duplicate entry" in str(insert_err):
+                    print(f"[MQTT->MySQL] Medição duplicada, já existente no MySQL: {id_move}")
+                else:
+                    print(f"[MQTT->MySQL] Erro ao inserir no MySQL: {insert_err}")
+                    return  # neste caso, não envia ACK porque foi erro inesperado
+
+        # Envia sempre o ACK, mesmo que duplicado
         ack_message = json.dumps({
             "IDMongo": id_move,
-            "collection": "Move"  # ou "sound", conforme a coleção certa
+            "collection": "Move"
         })
-        client.publish(GROUP_MQTT_ACK_TOPIC, ack_message,qos=2)
-
-        #mazeOcupation(marsami, room_origin, room_destiny)
-
+        client.publish(GROUP_MQTT_ACK_TOPIC, ack_message, qos=2)
         print(f"[MQTT->MySQL] Enviado ACK para {id_move}")
 
     except Exception as e:

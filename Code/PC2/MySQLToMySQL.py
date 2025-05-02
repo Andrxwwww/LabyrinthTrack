@@ -1,3 +1,4 @@
+import sys
 from datetime import datetime
 import pymysql
 import mariadb
@@ -21,6 +22,7 @@ def fetch_data_from_cloud(table):
     except Exception as e:
         print(f"Erro ao conectar à base de dados na nuvem: {e}")
         return None
+        # todo continuar com valores padrão
 
 
 # Função para inserir dados na base de dados local (MariaDB)
@@ -28,6 +30,9 @@ def insert_data_to_local(table, data):
     if not data:
         print(f"Nenhum dado novo para sincronizar na tabela {table}.")
         return
+
+    conn = None
+    cursor = None
 
     try:
         conn = mariadb.connect(
@@ -37,6 +42,8 @@ def insert_data_to_local(table, data):
             database="pisid_sql"
         )
         cursor = conn.cursor()
+
+
 
         if table == "Corridor":
             insert_query = """
@@ -83,10 +90,12 @@ def insert_data_to_local(table, data):
 
     except Exception as e:
         print(f"Erro ao conectar à base de dados local: {e}")
+        sys.exit(1)
     finally:
-        cursor.close()
-        conn.close()
-
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 # Sincronização das tabelas
 def main():
