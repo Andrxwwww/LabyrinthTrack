@@ -18,7 +18,7 @@ keep_alive_lock = threading.Lock()
 print("[MongoDB->MQTT] Conectando ao broker MQTT...")
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 client.connect(MQTT_BROKER, MQTT_PORT, 60)
-print("[MongoDB->MQTT] Conectado ao broker MQTT...")
+print("[MongoDB->MQTT] Conectado ao broker MQTT..." + MQTT_BROKER)
 
 # Handler para ACKs recebidos
 def on_message_ack(client, userdata, msg):
@@ -135,12 +135,12 @@ def publish_data(collection, mqtt_topic):
             else:
                 print(f"[MongoDB->MQTT] Tópico desconhecido: {mqtt_topic}")
 
-            time.sleep(0.5)
+            time.sleep(0.05)
 
         if not documentos_encontrados:
             print(f"[MongoDB->MQTT] Nenhum novo documento .")
 
-        time.sleep(1)  # Espera antes da próxima verificação
+        time.sleep(0.2)  # Espera antes da próxima verificação
 
 
 # Início da aplicação

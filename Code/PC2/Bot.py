@@ -6,7 +6,7 @@ import threading
 import paho.mqtt.client as mqtt
 
 # MQTT setup
-MQTT_BROKER = "broker.emqx.io"  # Adjust this to your MQTT broker address if needed
+MQTT_BROKER = "98.66.160.46"  # Adjust this to your MQTT broker address if needed
 MQTT_TOPIC = "pisid_mazeact"
 PLAYER_ID = 15
 

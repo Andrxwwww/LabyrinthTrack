@@ -2,7 +2,7 @@ import sys
 from pymongo import MongoClient
 
 # --- Configurações MQTT ---
-MQTT_BROKER = "broker.emqx.io"
+MQTT_BROKER = "98.66.160.46"
 MQTT_PORT = 1883
 
 # -- Configurações de MQTT já pré feitas ---

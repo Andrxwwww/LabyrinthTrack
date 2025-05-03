@@ -325,6 +325,7 @@ def start_mqtt_client(topic, on_message_callback):
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     client.on_message = on_message_callback
     client.connect(MQTT_BROKER, MQTT_PORT, 60)
+    print(f"[MQTT->MySQL] Conectado ao Broker" + MQTT_BROKER)
     client.subscribe(topic)
     client.subscribe(GROUP_MQTT_FAILED_TOPIC)
     print(f"[MQTT->MySQL] A ouvir mensagens MQTT no tópico {topic}...")
