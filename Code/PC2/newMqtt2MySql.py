@@ -13,6 +13,8 @@ from concurrent.futures import ThreadPoolExecutor
 # (Mantidas do código original com ajustes de formatação)
 from BDConfigs import *
 from BDdata_PC2 import *
+import MySQLToMySQL
+MySQLToMySQL.main()
 
 
 # Variáveis globais
