@@ -102,7 +102,6 @@ def verificar_outlier(sound_value , idjogo):
     return abs(sound_value - media) > limite
 
 def verificar_variacao_som(idjogo):
-    limite_60 = NOISEVARTOL * LIMITE_60
     limite_80 = NOISEVARTOL * LIMITE_80
 
     try:
@@ -133,8 +132,6 @@ def verificar_variacao_som(idjogo):
 
     if variacao >= limite_80:
         print("[Mqtt -> MySQL] Variação do som a 80% do limite.")
-    elif variacao >= limite_60:
-        print("[Mqtt -> MySQL] Variação do som a 60% do limite.")
 
 
 # Callback para mensagens de SOUND

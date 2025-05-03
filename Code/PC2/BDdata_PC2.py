@@ -57,7 +57,6 @@ try:
     LIMITE_DESVIO_PADRAO = float(get_config("limite_desvio_padrao"))
     QTD_VALS_SOUND_MAX = int(get_config("qtd_valores_sound_max"))
     QTD_VALS_SOUND_MIN = int(get_config("qtd_valores_sound_mIN"))
-    LIMITE_60 = float(get_config("limite_60"))
     LIMITE_80 = float(get_config("limite_80"))
     DATETIME_THRESHOLD = float(get_config("datetime_threshold"))
 
@@ -76,7 +75,6 @@ except Exception as e:
     LIMITE_DESVIO_PADRAO = 3.0
     QTD_VALS_SOUND_MAX = 4
     QTD_VALS_SOUND_MIN = 2
-    LIMITE_60 = 0.6
     LIMITE_80 = 0.8
     DATETIME_THRESHOLD = 5
 

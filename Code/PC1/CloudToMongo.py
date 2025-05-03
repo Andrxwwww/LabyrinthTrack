@@ -6,6 +6,9 @@ from datetime import datetime
 from MongoConfigs import *
 # from Validations_PC1 import check_duplicate_msgs
 
+#Broker novo:
+# > mazerun 15 1 1 98.66.160.46 1883
+
 # Limpar todas as coleções **REMOVER DEPOIS**
 collection_move.delete_many({})
 collection_sound.delete_many({})

@@ -135,12 +135,12 @@ def publish_data(collection, mqtt_topic):
             else:
                 print(f"[MongoDB->MQTT] Tópico desconhecido: {mqtt_topic}")
 
-            time.sleep(0.05)
+            time.sleep(1)
 
         if not documentos_encontrados:
             print(f"[MongoDB->MQTT] Nenhum novo documento .")
 
-        time.sleep(0.2)  # Espera antes da próxima verificação
+        time.sleep(4)  # Espera antes da próxima verificação
 
 
 # Início da aplicação
