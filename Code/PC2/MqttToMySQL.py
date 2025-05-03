@@ -13,6 +13,7 @@ MySQLToMySQL.main()
 ##coloar try cach
 from BDConfigs import *
 from BDdata_PC2 import *
+from Bot import *
 
 current_game = 0
 
@@ -212,6 +213,7 @@ def on_message_medicoes(client, userdata, msg):
                         (id_move, hour, room_origin, room_destiny, marsami, status, idjogo)
                     )
                     db.commit()
+                
                     print(f"[MQTT->MySQL] Guardado no MySQL (MEDIÇÕES): {dados}")
                 except Exception as insert_err:
                     if "Duplicate entry" in str(insert_err):
