@@ -67,21 +67,25 @@ def convert_data_for_failedCollection(dados, report, collection):
 
 def checkDataDuplicated(data, collection):
     try:
-        query_move = {
-            "Hora": data
-        }
-        count_move = collection_move.count_documents(query_move)
+        if collection == MONGO_COLLECTION_MOVE:
+            query_move = {
+                "Hora": data
+            }
+            count_move = collection_move.count_documents(query_move)
+            if count_move > 1:
+                print(f"[VALIDAÇÃO] Data duplicada encontrada: {data}")
+                return False
 
-        query_sound = {
-            "Hour": data
-        }
+        if collection == MONGO_COLLECTION_SOUND:
+            query_sound = {
+                "Hour": data
+            }
+            count_sound = collection_sound.count_documents(query_sound)
+            if count_sound > 1:
+                print(f"[VALIDAÇÃO] Data duplicada encontrada: {data}")
+                return False
         
-        count_sound = collection_sound.count_documents(query_sound)
         #print(f"[VALIDAÇÃO] Contagem de datas duplicadas: Move={count_move}, Sound={count_sound}")
-
-        if count_move + count_sound > 1:
-            print(f"[VALIDAÇÃO] Data duplicada encontrada: {data}")
-            return False
         
         return True
     
