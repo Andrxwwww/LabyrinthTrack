@@ -1,15 +1,23 @@
 <?php
 session_start();
-include 'db.php';
 
-$sql = "SELECT * FROM jogo WHERE jogador=?";
-$stmt = $connPisid->prepare($sql);
-$stmt->bind_param("i", $_SESSION['grupo']);
-$stmt->execute();
-$result = $stmt->get_result();
 
+$username = $_SESSION['db_email'];
+$password = $_SESSION['db_pass'];
+$grupo = $_SESSION['db_grupo'];
+$dbname = "pisid_sql";
+
+$connPisid = new mysqli('localhost', $username, $password, $dbname);
+if ($connPisid->connect_error) {
+    die("Ligação falhou: " . $connPisid->connect_error);
+}
+
+
+$sql = "call GetGames($grupo)";
+$result = mysqli_query($connPisid, $sql);
 $jogos = $result->fetch_all(MYSQLI_ASSOC);
-$stmt->close();
+mysqli_close ($connPisid);
+
 ?>
 
 
@@ -28,10 +36,13 @@ $stmt->close();
     />
     <link rel="stylesheet" href="style.css" />
   </head>
+  
   <body id="dashboard">
+  
+
     <div class="dashboard-container">
             <div class="dashboard-header">
-                <div class="dashboard-username"><h1>Utilizador:<?php echo $_SESSION['name']; ?></h1></div>
+                <div class="dashboard-username"><h1>Utilizador:<?php echo $_SESSION['db_nome']; ?></h1></div>
             <div class="dashboard-search">
                 <input placeholder="Pesquisar jogo"/>
             </div>
@@ -39,6 +50,7 @@ $stmt->close();
                 <button><i class='bx bxs-door-open'></i></button>
             </div>
         </div>
+        <?php if($result->num_rows>0) :?> 
             <div class="dashboard-content">
                 <div class="dashboard-table">
                     <div class="table-header">
@@ -46,42 +58,87 @@ $stmt->close();
                             <h3>Lista de Jogos</h3>
                         </div>
                         <div class="table-button">
-                            <button href="/CriarJogo.php" ><i class='bx bx-plus'></i> Criar novo jogo</button>
+                            <button onclick="location.href='CriarJogo.php';"><i class='bx bx-plus' ></i> Criar novo jogo</button>
                             
                 </div>
             </div>
             <table class="table">
-            
-                <thead>
+            <thead>
                     <tr>
+                        <th>Ações</th>
                         <th>ID</th>
                         <th>Descrição</th>
-                        <th>Jogador</th>
+                        <th>Utilizador</th>
                         <th>Data de Inicio</th>
-                        <th></th>
+                        <th>Estado</th>
                     </tr>
                 </thead>
+
+            <?php foreach ($jogos as $jogo): ?>
+                
                 <tbody>
                     <tr>
-                        <td>1</td>
-                        <td>Jogo de Teste</td>
-                        <td>Miguel</td>
-                        <td>2025-03-20 13:06:02.065 </td>
-                        <td style="display: flex;justify-content:start;align-items:center;padding-top:10px;"><i class='bx bxs-edit-alt' style="font-size:30px" class="edit-icon"></i></td>
-                    </tr>
-                    <tr>
-                        <td>2</td>
-                        <td>Jogo de Teste 2</td>
-                        <td>Ricardo</td>
-                        <td>2025-03-20 14:06:02.065</td>
-                        <td style="display: flex;justify-content:start;align-items:center;padding-top:10px;"><i class='bx bxs-edit-alt' style="font-size:30px" class="edit-icon"></i></td>
+                        <td><div class="action-buttons">
+                        <button class="action-button edit" onclick="location.href='editar.php?id=<?php echo $jogo['IDJogo']; ?>';">
+
+                                                <i style="font-size:large;" class='bx bx-edit'></i>
+                                            </button>
+                                            <button class="action-button delete" onclick="showDeleteGameDialog(<?php echo $jogo['IDJogo']; ?>)">
+                                                <i style="font-size:large;color:red;" class='bx bx-trash'></i>
+                                            </button>
+                                            <button class="action-button start" onclick="startGame(<?php echo $jogo['IDJogo']; ?>)" >
+                                                <i style="font-size:large;color:green;" class='bx bx-play'></i>
+                                            </button>
+                                        </div></td>
+                        <td><?php echo $jogo['IDJogo']?></td>
+                        <td><?php echo $jogo['Descricao']?></td>
+                        <td><?php echo $jogo['jogador']?></td>
+                        <td><?php echo $jogo['DataHorainicio']?></td>
+                        <td ><div style="margin-left:auto; margin-right:auto;" class="estado-<?php echo $jogo['Estado']; ?>"><?php echo $jogo['Estado']?></div></td>
                     </tr>
                 </tbody>
-           
+                <?php endforeach; ?>
             </table>
         </div>
     </div>
-        
+        <?php else : ?>
+            <div class="dashboard-content">
+                <div class="dashboard-table">
+                    <div class="table-header">
+                        <div class="table-title">
+                            <h3>Lista de Jogos</h3>
+                        </div>
+                        <div class="table-button">
+                            <button><i class='bx bx-plus' ></i> Criar novo jogo</button>
+                            
+                </div>
+            </div>
+            <div >
+                                <h3>Não existe nenhum jogo na base de dados</h3>  
+                            </div>
+        </div>
     </div>
+        <?php endif; ?>  
+    </div>
+    <script>
+function showDeleteGameDialog(idJogo) {
+    if (confirm("Tem a certeza que deseja eliminar este jogo?")) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = 'eliminarJogoHandler.php';
+
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'id_jogo';
+        input.value = idJogo;
+
+        form.appendChild(input);
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+</script>
   </body>
 </html>
+
+

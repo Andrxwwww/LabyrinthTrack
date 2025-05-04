@@ -8,7 +8,7 @@
       href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="style.css?v=<?php echo time(); ?>">
   </head>
   <body id="login">
     <div class="flip-card">

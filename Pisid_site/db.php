@@ -2,12 +2,12 @@
 $servername = "localhost";
 $username = "root";
 $password = "";
-$dbname = "new_pisid";
+$dbname = "pisid_sql";
 
 $connPisid = new mysqli($servername, $username, $password, $dbname);
-$connMySql = new mysqli($servername, $username, $password, "mysql");
+
 // Check connection
-if ($connPisid->connect_error || $connMySql->connect_error) {
+if ($connPisid->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 

@@ -2,13 +2,17 @@
 session_start();
 include 'db.php';
 
-$sql = "SELECT * FROM jogo WHERE jogador=?";
+if (!isset($_GET['id'])) {
+    die("ID do jogo não especificado.");
+}
+$idJogo = intval($_GET['id']);
+
+$sql = "SELECT * FROM jogo WHERE IDJogo = ?";
 $stmt = $connPisid->prepare($sql);
-$stmt->bind_param("i", $_SESSION['grupo']);
+$stmt->bind_param("i", $idJogo);
 $stmt->execute();
 $result = $stmt->get_result();
-
-$jogos = $result->fetch_all(MYSQLI_ASSOC);
+$jogo = $result->fetch_assoc();
 $stmt->close();
 ?>
 
@@ -29,9 +33,9 @@ $stmt->close();
     <link rel="stylesheet" href="style.css" />
   </head>
   <body id="dashboard" style="overflow: hidden;">
-    <div class="dashboard-container" style="height:20vh">
+    <div class="dashboard-container" style="height:100vh">
             <div class="dashboard-header">
-                <div class="dashboard-username"><h1>Utilizador:<?php echo $_SESSION['name']; ?></h1></div>
+                <div class="dashboard-username"><h1>Utilizador:<?php echo $_SESSION['db_nome']; ?></h1></div>
             <div class="dashboard-search">
                 <input placeholder="Pesquisar jogo"/>
             </div>
@@ -39,46 +43,44 @@ $stmt->close();
                 <button><i class='bx bxs-door-open'></i></button>
             </div>
         </div>
-            <div class="dashboard-content">
-                <div class="dashboard-table" style="min-height:0; padding:0;">
-            <table class="table">
-            
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Descrição</th>
-                        <th>Jogador</th>
-                        <th>Data de Inicio</th>
-                        <th>Estado</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>1</td>
-                        <td>Jogo de Teste</td>
-                        <td>Miguel</td>
-                        <td>2025-03-20 13:06:02.065 </td>
-                        <td >Finalizado</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
+        <div class="form-container">
+            <form  class="form" action="editarJogoHandler.php" method="post"> 
+                
+                    <div  class="form-title">
+                        <div>
+                            <div class="form-gameid">Detalhe do Jogo #<?php echo htmlspecialchars($jogo['IDJogo']); ?></div>
+                            <div class="form-viewinfo">Visualize e edite as informações do jogo</div>
+                        </div>
+                        <div class="form-estado">
+                            <div class="estado-<?php echo htmlspecialchars($jogo['Estado']); ?>"><?php echo htmlspecialchars($jogo['Estado']); ?></div>
+                        </div>
+                    </div>
+                    <div class="form-info">
+                        <div class="form-infos">Informações</div>
+                        <div>
+                            <div class="form-label">Jogador</div>
+                            <div class="form-values"><?php echo htmlspecialchars($jogo['jogador']); ?></div>
+                        </div>
+                        <div>
+                            <div class="form-label">Data de Inicio</div>
+                            <div class="form-values"><?php echo htmlspecialchars($jogo['DataHorainicio']); ?></div>
+                        </div>
+                        <div>
+                            <div class="form-label"> Descrição</div>
+                            <input type="textarea" class="form-description" name="descricao" value=<?php echo htmlspecialchars($jogo['Descricao']); ?> />
+                            <input type="hidden" name="id_jogo" value=<?php echo htmlspecialchars($jogo['IDJogo']); ?> />
+                        </div>
+                    </div>
+                    <div class="form-buttons">
+                    <div class="form-voltar">
+        <button type="button" onclick="location.href='dashboard.php'">Voltar</button></div>
+        <div class="form-guardar">
+                    <button type="submit" name="id_jogo" value="<?php echo $jogo['IDJogo']; ?>">Guardar Alterações</button>
+                </div>
+                    </div>
+             
+            </form>
+            </div>
     </div>
-
-    <div style="width: 90%;background-color:white;margin:20px auto;padding:40px 0;border-radius:20px;">
-        <div style="display:flex; justify-content:center;align-items:center;flex-direction:column;">
-            <label style="margin-bottom:30px;font-weight:600;font-size:20px;">Editar descrição</label>
-            <textarea name="descricao" id="descricao" cols="240" rows="10" placeholder="Jogo de Teste"></textarea>
-        </div>
-        <div style="margin-top:40px;display:flex; justify-content:end;align-items:center;padding-right:30px;font-size:15px;">
-            <button style="margin-right:20px;padding:10px;border-radius:10px;border:none;font-size:15px;background-color:lightgreen;color:white;font-weight:700">Guardar Alterações</button>
-            <button style="margin-right:20px;padding:10px;border-radius:10px;border:none;font-size:15px;background-color:red;color:white;font-weight:700">Eliminar jogo</button>
-            <button style="padding:10px;border-radius:10px;border:none;color:white;font-size:15px;background-color:gray;font-weight:700;">Voltar</button>
-
-        </div>
-    </div>
-    </div>
-
-    
   </body>
 </html>
