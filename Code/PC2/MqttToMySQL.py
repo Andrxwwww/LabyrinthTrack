@@ -13,7 +13,6 @@ MySQLToMySQL.main()
 ##coloar try cach
 from BDConfigs import *
 from BDdata_PC2 import *
-from Bot import *
 
 current_game = 0
 
