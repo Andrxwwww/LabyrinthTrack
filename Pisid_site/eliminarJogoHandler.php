@@ -16,7 +16,6 @@ if ($conn->connect_error) {
     die("Erro na ligação: " . $conn->connect_error);
 }
 
-// Prepare and execute stored procedure
 $stmt = $conn->prepare("CALL EliminateGame(?)");
 $stmt->bind_param("i", $idJogo);
 

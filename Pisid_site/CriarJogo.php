@@ -51,7 +51,7 @@ mysqli_close ($connPisid);
                 <div style="margin-top:60px;">
                     <div style="display: flex;justify-content:start;align-items:center;margin-top:30px;">
                         <label style="font-size:30px;margin-right:10px;">Descrição:</label>
-                        <textarea name="descricao" id="descricao" cols="100" rows="4" placeholder=""></textarea>
+                        <input type="textarea" name="descricao" id="descricao" cols="100" rows="4" placeholder="" />
                     </div>
                     <div style="font-size:30px;margin-top:30px;">Utilizador: <?php echo $_SESSION['db_nome']; ?></div>
                     <p style="display: flex;justify-content:end;">

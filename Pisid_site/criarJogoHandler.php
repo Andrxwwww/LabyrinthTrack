@@ -6,19 +6,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $password = $_SESSION['db_pass'];
     $grupo = $_SESSION['db_grupo'];
     $descricao = $_POST['descricao'];
-
-    $conn = new mysqli("localhost", $username, $password, "pisid");
-
+    $dbname = "pisid_sql";
+    $conn = new mysqli("localhost", $username, $password, $dbname);
     if ($conn->connect_error) {
-        die("Ligação falhou: " . $conn->connect_error);
+        die("Erro na ligação: " . $conn->connect_error);
     }
 
-    $sql = "call StartGame($descricao)";
-    $result = mysqli_query($conn, $sql);
-    if ($result) {
-        // success: redirect or message
-        echo "111111111111";// or wherever you want
-        exit();
+    $stmt = $conn->prepare("CALL StartGame(?)");
+    $stmt->bind_param("s", $descricao);
+
+    if ($stmt->execute()) {
+        header("Location: dashboard.php");
     } else {
         echo "Erro ao criar jogo: " . $stmt->error;
     }
