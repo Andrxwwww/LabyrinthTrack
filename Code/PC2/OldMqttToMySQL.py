@@ -1,30 +1,20 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 import paho.mqtt.client as mqtt
 import json
 import threading
 import time
 from decimal import Decimal
-import statistics
-import mariadb
-from queue import Queue
-from concurrent.futures import ThreadPoolExecutor
 
-# Configurações e inicializações de banco de dados
-# (Mantidas do código original com ajustes de formatação)
-from BDConfigs import *
-from BDdata_PC2 import *
+
+#Coloca os valores inicias na tabela(corridor) e (setupmaze)
 import MySQLToMySQL
 MySQLToMySQL.main()
 
+##coloar try cach
+from BDConfigs import *
+from BDdata_PC2 import *
 
-# Variáveis globais
 current_game = 0
-db_lock = threading.Lock()
-current_game_lock = threading.Lock()
-
-# Estruturas para processamento paralelo
-message_queue = Queue()
-executor = ThreadPoolExecutor(max_workers=4)  # Ajuste conforme necessidade
 
 # Função para validar datas
 def validar_data(data):
@@ -35,7 +25,7 @@ def validar_data(data):
     except ValueError:
         print(f"[MQTT->MySQL] Data inválida: {data}.")
         return False
-
+    
     # Validação 4: Verifica se a data está atual e no intervalo correto
     datetime_obj = datetime.strptime(data, "%Y-%m-%d %H:%M:%S.%f")
     data_atual = datetime.now()
@@ -59,27 +49,27 @@ def validar_mensagem_move(doc):
     # Validação 4: Sala origem igual ao mínimo e destino dentro do intervalo, status OK
     if (origem == sala_min or sala_min < destino <= sala_max) and status == status_ok:
         return True
-
+    
     # Validação 5: Origem e destino iguais ao mínimo, status é "nenhuma porta" ou "cansado"
     if (origem == sala_min or destino == sala_min) and status in [status_fail, status_cansado]:
         return True
-
+    
     # Validação 6: Origem e destino dentro do intervalo, status OK
     if (sala_min < origem <= sala_max or sala_min < destino <= sala_max) and status == status_ok:
         return True
-
+    
     # TODO: DEPOIS TIRAR PARA DADOS MAIS RECENTES
     # Validação 7: Verificar se a data está dentro do intervalo
     #if not validar_data(Hora):
     #   return False
-
+    
     return False
 
 
 
 # Funcao para verificar se é outlier ou nao
 def verificar_outlier(sound_value , idjogo):
-
+    
     limite = NOISEVARTOL * LIMITE_DESVIO_PADRAO  # Limite para considerar um valor como outlier
 
     # Obter os últimos 4 valores válidos do som para o jogo
@@ -111,7 +101,10 @@ def verificar_outlier(sound_value , idjogo):
     return abs(sound_value - media) > limite
 
 def verificar_variacao_som(idjogo):
+
+    NOISEVALMAX = NORMALNOISE + NOISEVARTOL
     limite_80 = NOISEVARTOL * LIMITE_80
+    limite_98 = NOISEVARTOL * LIMITE_98
 
     try:
         cursor.execute("""
@@ -136,19 +129,23 @@ def verificar_variacao_som(idjogo):
         print(f"[Mqtt -> MySQL] Erro ao converter valores de som: {e}")
         return
 
-    variacao = abs(ultimo - penultimo)
-    print(variacao)
+    #variacao = abs(ultimo - penultimo)
+    #print(variacao)
+    print(ultimo - NOISEVALMAX)
+    if ultimo - NOISEVALMAX <= limite_98:
+        print("[Mqtt -> MySQL] Variação do som a 98% do limite.")
+        print(f"[Mqtt -> MySQL] FECHAR PORTAS ASAP")
 
-    if variacao >= limite_80:
+    if ultimo - NOISEVALMAX <= limite_80:
         print("[Mqtt -> MySQL] Variação do som a 80% do limite.")
 
 
 # Callback para mensagens de SOUND
-def process_sound_message(payload):
+def on_message_sound(client, userdata, msg):
     try:
-        dados = json.loads(payload)
-        print(f"[MQTT->MySQL] Mensagem SOUND recebida: {dados}")
 
+        dados = json.loads(msg.payload.decode())
+        print(f"[MQTT->MySQL] Mensagem recebida: {dados}")
         id_sound = dados.get("IDSound")
         sound = float(Decimal(dados.get("Sound")))
         hour = dados.get("Hour")
@@ -156,12 +153,11 @@ def process_sound_message(payload):
         idjogo = get_idjogo_atual()
         if idjogo is None:
             print("[MQTT->MySQL] Nenhum jogo com estado 'running' encontrado.")
-            idjogo = 1
-
-        if verificar_outlier(sound, idjogo):
-            dados_som = json.dumps(
-                convert_data_for_failedCollection(dados, "5. [Mqtt->MySQL] Outlier detectado", "Sound"))
-            client_mqtt.publish(GROUP_MQTT_FAILED_TOPIC, dados_som)
+            idjogo=1
+        
+        if verificar_outlier(sound , idjogo):
+            dados_som = json.dumps(convert_data_for_failedCollection(dados, "5. [Mqtt->MySQL] Outlier detectado", "Sound"))
+            client.publish(GROUP_MQTT_FAILED_TOPIC, dados_som)
             print(f"[MQTT->MySQL] Mensagem inválida Sound: {dados}")
         else:
             verificar_variacao_som(idjogo)
@@ -175,28 +171,26 @@ def process_sound_message(payload):
                     print(f"[MQTT->MySQL] Guardado no MySQL (SOUND): {dados}")
                 except Exception as insert_err:
                     if "Duplicate entry" in str(insert_err):
-                        print(f"[MQTT->MySQL] Som duplicado: {id_sound}")
+                        print(f"[MQTT->MySQL] Som duplicado, já existente no MySQL: {id_sound}")
                     else:
-                        print(f"[MQTT->MySQL] Erro ao inserir som: {insert_err}")
-                        return
+                        print(f"[MQTT->MySQL] Erro ao inserir no MySQL: {insert_err}")
+                        return  # só não envia ACK se o erro for inesperado
 
-        # Enviar ACK
-        ack_message = json.dumps({
-            "IDMongo": id_sound,
-            "collection": "Sound"
-        })
-        client_mqtt.publish(GROUP_MQTT_ACK_TOPIC, ack_message, qos=2)
-        print(f"[MQTT->MySQL] ACK enviado para {id_sound}")
+            # Enviar sempre o ACK
+            ack_message = json.dumps({
+                "IDMongo": id_sound,
+                "collection": "Sound"
+            })
+            client.publish(GROUP_MQTT_ACK_TOPIC, ack_message, qos=2)
+            print(f"[MQTT->MySQL] Enviado ACK para {id_sound}")
 
     except Exception as e:
-        print(f"[SOUND] Erro no processamento: {e}")
+        print(f"[MQTT->MySQL] Erro ao processar mensagem SOUND: {e}")
 
 # Callback para mensagens de MEDIÇÕES
-def process_move_message(payload):
+def on_message_medicoes(client, userdata, msg):
     try:
-        dados = json.loads(payload)
-        print(f"[MQTT->MySQL] Mensagem MOVE recebida: {dados}")
-
+        dados = json.loads(msg.payload.decode())
         id_move = dados.get("IDMove")
         marsami = dados.get("Marsami")
         room_origin = dados.get("RoomOrigin")
@@ -211,62 +205,39 @@ def process_move_message(payload):
 
         if not validar_mensagem_move(dados):
             dados_move = json.dumps(convert_data_for_failedCollection(dados, "4. Mensagem inválida", "Move"))
-            client_mqtt.publish(GROUP_MQTT_FAILED_TOPIC, dados_move)
+            client.publish(GROUP_MQTT_FAILED_TOPIC, dados_move)
             print(f"[MQTT->MySQL] Mensagem inválida Move: {dados}")
             return
+        else:
+            with db_lock:
+                try:
+                    cursor.execute(
+                        "INSERT INTO medicoespassagens (IDMedicao, Hora, SalaOrigem, SalaDestino, Marsami, Status, IDJogo) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                        (id_move, hour, room_origin, room_destiny, marsami, status, idjogo)
+                    )
+                    db.commit()
+                
+                    print(f"[MQTT->MySQL] Guardado no MySQL (MEDIÇÕES): {dados}")
+                except Exception as insert_err:
+                    if "Duplicate entry" in str(insert_err):
+                        print(f"[MQTT->MySQL] Medição duplicada, já existente no MySQL: {id_move}")
+                    else:
+                        print(f"[MQTT->MySQL] Erro ao inserir no MySQL: {insert_err}")
+                        return  # neste caso, não envia ACK porque foi erro inesperado
 
-        with db_lock:
-            try:
-                cursor.execute(
-                    "INSERT INTO medicoespassagens (IDMedicao, Hora, SalaOrigem, SalaDestino, Marsami, Status, IDJogo) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-                    (id_move, hour, room_origin, room_destiny, marsami, status, idjogo)
-                )
-                db.commit()
-                print(f"[MQTT->MySQL] Guardado no MySQL (MOVE): {dados}")
-            except Exception as insert_err:
-                if "Duplicate entry" in str(insert_err):
-                    print(f"[MQTT->MySQL] Medição duplicada: {id_move}")
-                else:
-                    print(f"[MQTT->MySQL] Erro ao inserir movimento: {insert_err}")
-                    return
-
-        # Enviar ACK
+        # Envia sempre o ACK, mesmo que duplicado
         ack_message = json.dumps({
             "IDMongo": id_move,
             "collection": "Move"
         })
-        client_mqtt.publish(GROUP_MQTT_ACK_TOPIC, ack_message, qos=2)
-        print(f"[MQTT->MySQL] ACK enviado para {id_move}")
+        client.publish(GROUP_MQTT_ACK_TOPIC, ack_message, qos=2)
+        print(f"[MQTT->MySQL] Enviado ACK para {id_move}")
 
     except Exception as e:
-        print(f"[MOVE] Erro no processamento: {e}")
+        print(f"[MQTT->MySQL] Erro ao processar mensagem MEDIÇÕES: {e}")
 
-# Callback MQTT unificado
-def on_message(client, userdata, msg):
-    try:
-        payload = msg.payload.decode()
-        message_queue.put((msg.topic, payload))
-        print(f"[MQTT] Mensagem recebida no tópico {msg.topic}")
-    except Exception as e:
-        print(f"[MQTT] Erro no callback geral: {e}")
 
 current_game_lock = threading.Lock()
-
-
-
-# Consumidor da fila
-def queue_consumer():
-    while True:
-        try:
-            topic, payload = message_queue.get()
-            if topic == GROUP_MQTT_SOUND_TOPIC:
-                executor.submit(process_sound_message, payload)
-            elif topic == GROUP_MQTT_MOVE_TOPIC:
-                executor.submit(process_move_message, payload)
-            message_queue.task_done()
-        except Exception as e:
-            print(f"[Consumer] Erro no consumer: {e}")
-        time.sleep(0.01)
 
 def createGame(idjogo):
     global current_game
@@ -351,37 +322,39 @@ def reconnect_db():
             print(f"[MQTT->MySQL] Erro ao reconectar ao MySQL: {e}")
             time.sleep(10)
 
-# Configuração do cliente MQTT
-def start_mqtt_client():
-    global client_mqtt
-    client_mqtt = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
-    client_mqtt.on_message = on_message
-    client_mqtt.connect(MQTT_BROKER, MQTT_PORT, 60)
-    client_mqtt.subscribe([
-        (GROUP_MQTT_SOUND_TOPIC, 2),
-        (GROUP_MQTT_MOVE_TOPIC, 2)
-    ])
-    print("[MQTT] Conectado e inscrito em todos os tópicos")
-    client_mqtt.loop_forever()
 
+# Função para criar um cliente MQTT numa thread
+def start_mqtt_client(topic, on_message_callback):
+    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    client.on_message = on_message_callback
+    client.connect(MQTT_BROKER, MQTT_PORT, 60)
+    print(f"[MQTT->MySQL] Conectado ao Broker" + MQTT_BROKER)
+    client.subscribe(topic)
+    client.subscribe(GROUP_MQTT_FAILED_TOPIC)
+    print(f"[MQTT->MySQL] A ouvir mensagens MQTT no tópico {topic}...")
+    client.loop_forever()
 
 if __name__ == "__main__":
-    # Inicialização do banco de dados
+    # Criar duas threads para os dois tópicos
 
-    # Threads principais
-    mqtt_thread = threading.Thread(target=start_mqtt_client, daemon=True)
-    consumer_thread = threading.Thread(target=queue_consumer, daemon=True)
-    keep_alive_thread = threading.Thread(target=keep_alive_sender, daemon=True)
+    thread_sound = threading.Thread(target=start_mqtt_client, args=(GROUP_MQTT_SOUND_TOPIC, on_message_sound))
+    thread_medicoes = threading.Thread(target=start_mqtt_client, args=(GROUP_MQTT_MOVE_TOPIC, on_message_medicoes))
 
-    mqtt_thread.start()
-    consumer_thread.start()
-    keep_alive_thread.start()
+    # Criar thread para o keep_alive
+    thread_keep_alive = threading.Thread(target=keep_alive_sender)
+
+    # Iniciar as threads
+    thread_sound.start()
+    thread_medicoes.start()
+    thread_keep_alive.start()
 
     try:
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        print("\n[MQTT->MySQL] Encerrando...")
-        executor.shutdown(wait=True)
-        db.close()
-        print("[MySQL] Conexão fechada")
+        print("\n[MQTT->MySQL] Interrompido pelo utilizador.")
+
+    # Esperar as threads terminarem (caso seja necessário)
+    thread_sound.join()
+    thread_medicoes.join()
+    thread_keep_alive.join()

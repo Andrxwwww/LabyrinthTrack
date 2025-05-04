@@ -54,10 +54,12 @@ def get_config_prof(chave):
 try:
     # PARA SOUND
     NOISEVARTOL = float(get_config_prof("noisevartoleration"))
+    NORMALNOISE = float(get_config_prof("normalnoise"))
     LIMITE_DESVIO_PADRAO = float(get_config("limite_desvio_padrao"))
     QTD_VALS_SOUND_MAX = int(get_config("qtd_valores_sound_max"))
     QTD_VALS_SOUND_MIN = int(get_config("qtd_valores_sound_mIN"))
     LIMITE_80 = float(get_config("limite_80"))
+    LIMITE_90 = float(get_config("limite_90"))
     DATETIME_THRESHOLD = float(get_config("datetime_threshold"))
 
     # PARA MOVE
@@ -71,11 +73,13 @@ try:
 except Exception as e:
     print(f"Erro ao carregar configurações globais: {e}")
     print("[AVISO] A usar valores padrão de emergência.")
-    NOISEVARTOL = 19
+    NORMALNOISE = 19
+    NOISEVARTOL = 2.5
     LIMITE_DESVIO_PADRAO = 3.0
     QTD_VALS_SOUND_MAX = 4
     QTD_VALS_SOUND_MIN = 2
     LIMITE_80 = 0.8
+    LIMITE_90 = 0.90
     DATETIME_THRESHOLD = 5
 
     status_ok = 1
