@@ -1,17 +1,17 @@
 <?php
 $db = "pisid_sql"; 
 $dbhost = "localhost"; 
-$username = $_POST["username"];
-$password = $_POST["password"];
-$sensor = $_POST["sensor"];
+#$username = $_POST["username"];
+#$password = $_POST["password"];
+#$sensor = $_POST["sensor"];
 
-$conn = mysqli_connect($dbhost, $username, $password, $db);// Create connection
+$conn = mysqli_connect($dbhost, 'root', "", $db);// Create connection
 
 if (!$conn) {// Check connection
     die("Connection failed: " . mysqli_connect_error());
 }
 
-$sql = "SELECT Hour, Sound, normalnoise from sound, setupmaze where IDSound = $sensor AND Hour >= NOW() - INTERVAL 10 SECOND  ORDER BY Hour DESC;";
+$sql = "SELECT Hour, Sound, normalnoise from sound, setupmaze where Hour >= NOW() - INTERVAL 1000 SECOND  ORDER BY Hour DESC;";
 
 $result = mysqli_query($conn, $sql);// Execute the query
 $response = array();

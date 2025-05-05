@@ -1,16 +1,16 @@
 <?php
 $db = "pisid_sql"; 
 $dbhost = "localhost"; 
-$username = $_POST["username"];
-$password = $_POST["password"];
+//$username = $_POST["username"];
+//$password = $_POST["password"];
 
-$conn = mysqli_connect($dbhost, $username, $password, $db);// Create connection
+$conn = mysqli_connect($dbhost, 'root', '', $db);// Create connection
 
 if (!$conn) {// Check connection
     die("Connection failed: " . mysqli_connect_error());
 }
 
-$sql = "SELECT * FROM `ocupaçãolabirinto` WHERE `IDJogo` = (SELECT MAX(`IDJogo`) FROM `ocupaçãolabirinto`) ORDER BY `Sala`;";
+$sql = "SELECT * FROM `ocupacaolabirinto` WHERE `IDJogo` = (SELECT MAX(`IDJogo`) FROM `ocupacaolabirinto`) ORDER BY `Sala`;";
 
 $result = mysqli_query($conn, $sql);// Execute the query
 $response = array();

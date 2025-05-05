@@ -1,11 +1,10 @@
--<?php
-    $db = "pisid_sql"; 
-	$dbhost = "localhost"; 
-	$username = $_POST["username"];
-	$password = $_POST["password"];
-	$conn = mysqli_connect($dbhost, $username, $password, $db);	
-	$sql = "CALL startGame()";
-	$result = mysqli_query($conn, $sql);
-	mysqli_close ($conn);
-	echo json_encode($result);
+<?php
+// Comando para executar o script .bat
+$command = "C:\\Users\\bruno\\Desktop\\pisidtraba\\versao2\\run.bat";
+
+// Executa o comando sem bloquear o PHP
+shell_exec('start "" cmd /k "' . $command . '"');
+
+// Opcionalmente retorna algo ao browser
+echo json_encode(["status" => "Comando enviado para terminal."]);
 ?>

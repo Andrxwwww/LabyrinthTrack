@@ -1,29 +1,21 @@
 <?php 
-$db = "pisid_sql";
-$dbhost = "localhost";
-$return = ["message" => "", "success" => false];
-$username = $_POST["username"] ?? '';
-$password = $_POST["password"] ?? '';
-
-// Tenta conectar ao MySQL
-$conn = mysqli_connect($dbhost, $username, $password);
-
-if ($conn) {
-    // Verifica se o usuário tem acesso ao banco 'pisid_sql'
-    $checkDB = mysqli_select_db($conn, $db);
-    
-    if ($checkDB) {
-        $return["success"] = true;
-        $return["message"] = "Login válido!";
-    } else {
-        $return["message"] = "Usuário não tem acesso ao banco de dados.";
-    }
-    
-    mysqli_close($conn);
-} else {
-    $return["message"] = "Credenciais inválidas ou erro de conexão.";
-}
-
-header('Content-Type: application/json');
-echo json_encode($return);
+	$db = "pisid_sql";
+	$dbhost = "localhost";
+	$return["message"] = "";
+	$return["success"] = false;
+	$username = $_POST["username"];
+	$password = $_POST["password"];
+	//$username = "root";
+	//$password = "";
+	try {
+		$conn = mysqli_connect($dbhost, $username, $password, $db);	
+		mysqli_close($conn);		
+		header('Content-Type: application/json');
+		$return["success"] = true;
+		echo json_encode($return);
+	} catch (Exception $e) {
+		$return["message"] = "The login failed. Check if the user exists in the database.";
+		header('Content-Type: application/json');	
+		echo json_encode($return);		
+	}
 ?>
