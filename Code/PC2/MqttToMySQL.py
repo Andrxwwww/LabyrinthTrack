@@ -110,7 +110,7 @@ def verificar_outlier(sound_value , idjogo):
     media = statistics.mean(historico)
     return abs(sound_value - media) > limite
 
-def verificar_variacao_som(sound_value):
+def verificar_variacao_som(sound_value,id_sound, hour, idjogo):
 
     VARTOL_80 = NOISEVARTOL * LIMITE_80
     VARTOL_90 = NOISEVARTOL * LIMITE_90
@@ -133,8 +133,34 @@ def verificar_variacao_som(sound_value):
     if ultimo >= S90_LIMIT_NOISE:
         print("[Mqtt -> MySQL] Variação do som a 90% do limite.")
         print(f"[Mqtt -> MySQL] FECHAR PORTAS ASAP")
+
+        with db_lock:
+            try:
+                cursor.execute(
+                    "INSERT INTO mensagens (ID, Hora, Sala, Sensor, Leitura, TipoAlerta, Msg, HoraEscrita, IdJogo) "
+                    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                    (id_sound, hour, None, 2, round(ultimo, 2), "Limite 90%", "Som a 90% do limite", datetime.now().strftime('%Y-%m-%d %H:%M:%S'), idjogo)
+                )
+                db.commit()
+                print(f"[MQTT->MySQL] Registro inserido na tabela mensagens: Som a 90% do limite (ID {id_sound})")
+            except Exception as e:
+                print(f"[MQTT->MySQL] Erro ao inserir na tabela mensagens: {e}")
+
+
     elif ultimo >= S80_LIMIT_NOISE:
         print("[Mqtt -> MySQL] Variação do som a 80% do limite.")
+
+        with db_lock:
+            try:
+                cursor.execute(
+                    "INSERT INTO mensagens (ID, Hora, Sala, Sensor, Leitura, TipoAlerta, Msg, HoraEscrita, IdJogo) "
+                    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                    (id_sound, hour, None, 2, round(ultimo, 2), "Limite 80%", "Som a 80% do limite", datetime.now().strftime('%Y-%m-%d %H:%M:%S'), idjogo)
+                )
+                db.commit()
+                print(f"[MQTT->MySQL] Registro inserido na tabela mensagens: Som a 80% do limite (ID {id_sound})")
+            except Exception as e:
+                print(f"[MQTT->MySQL] Erro ao inserir na tabela mensagens: {e}")
     else:
         print("[Mqtt -> MySQL] Variação do som abaixo de 80% do limite.")
 
@@ -158,8 +184,21 @@ def process_sound_message(payload):
                 convert_data_for_failedCollection(dados, "5. [Mqtt->MySQL] Outlier detectado", "Sound"))
             client_mqtt.publish(GROUP_MQTT_FAILED_TOPIC, dados_som)
             print(f"[MQTT->MySQL] Mensagem inválida Sound: {dados}")
+
+            with db_lock:
+                try:
+                    cursor.execute(
+                        "INSERT INTO mensagens (ID, Hora, Sala, Sensor, Leitura, TipoAlerta, Msg, HoraEscrita, IdJogo) "
+                        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                        (id_sound, hour, None , 1 , round(float(sound),2), "Outlier", "Outlier detetado", datetime.now().strftime('%Y-%m-%d %H:%M:%S'), idjogo)
+                    )
+                    db.commit()
+                    print(f"[MQTT->MySQL] Registro inserido na tabela mensagens para outlier: ID {id_sound}")
+                except Exception as e:
+                    print(f"[MQTT->MySQL] Erro ao inserir na tabela mensagens: {e}")
+
         else:
-            verificar_variacao_som(sound)
+            verificar_variacao_som(sound , id_sound, hour, idjogo)
             with db_lock:
                 try:
                     cursor.execute(
