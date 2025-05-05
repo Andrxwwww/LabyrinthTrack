@@ -48,7 +48,7 @@ def check_balance():
                     trigger_count[room_id] = 0
 
                 # Lógica de trigger mantida
-                if odd == even and (odd + even) > 2 and trigger_count[room_id] < 3:
+                if odd == even and (odd + even) >= 2 and trigger_count[room_id] < 3:
                     trigger_count[room_id] += 1
 
                     # Mensagem formatada como string (igual ao primeiro código)
@@ -60,7 +60,7 @@ def check_balance():
                     if trigger_count[room_id] == 3:
                         print(f"Sala {room_id} atingiu 3 tentativas!")
 
-            time.sleep(5)
+            time.sleep(1)
 
         except Exception as e:
             print(f"Erro: {e}")

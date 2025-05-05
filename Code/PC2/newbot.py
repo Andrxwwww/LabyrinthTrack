@@ -119,7 +119,7 @@ def check_score_triggers():
                 even = state["even"]
 
                 # Condições para disparar o Score
-                if odd == even and (odd + even) > 2:
+                if odd == even and (odd + even) >= 2:
                     if room_id not in trigger_count:
                         trigger_count[room_id] = 0
 
@@ -132,7 +132,7 @@ def check_score_triggers():
                         if trigger_count[room_id] == 3:
                             print(f"⚠️ Sala {room_id} atingiu o limite de 3 triggers!")
 
-            time.sleep(5)  # Verificar a cada 5 segundos
+            time.sleep(0.02)  # Verificar a cada 5 segundos
         except Exception as e:
             print(f"Erro na verificação de pontuação: {e}")
 

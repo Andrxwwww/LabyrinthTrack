@@ -139,7 +139,7 @@ def verificar_variacao_som(sound_value,id_sound, hour, idjogo):
                 cursor.execute(
                     "INSERT INTO mensagens (ID, Hora, Sala, Sensor, Leitura, TipoAlerta, Msg, HoraEscrita, IdJogo) "
                     "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
-                    (id_sound, hour, None, 2, round(ultimo, 2), "Limite 90%", "Som a 90% do limite", datetime.now().strftime('%Y-%m-%d %H:%M:%S'), idjogo)
+                    (id_sound, hour, None, 1, round(ultimo, 2), "Limite 90%", "Som a 90% do limite", datetime.now().strftime('%Y-%m-%d %H:%M:%S'), idjogo)
                 )
                 db.commit()
                 print(f"[MQTT->MySQL] Registro inserido na tabela mensagens: Som a 90% do limite (ID {id_sound})")
