@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Tempo de geração: 03-Maio-2025 às 19:10
+-- Tempo de geração: 05-Maio-2025 às 02:36
 -- Versão do servidor: 10.4.32-MariaDB
 -- versão do PHP: 8.2.12
 
@@ -325,6 +325,7 @@ CREATE TABLE `configs` (
 INSERT INTO `configs` (`chave`, `valor`) VALUES
 ('datetime_threshold', '5'),
 ('limite_80', '0.8'),
+('limite_90', '0.9'),
 ('limite_desvio_padrao', '3'),
 ('num_sala_max', '10'),
 ('num_sala_min', '0'),
@@ -455,10 +456,10 @@ DELIMITER ;
 CREATE TABLE `mensagens` (
   `ID` int(11) NOT NULL,
   `Hora` timestamp NULL DEFAULT NULL ON UPDATE current_timestamp(),
-  `Sala` int(11) NOT NULL,
+  `Sala` int(11) DEFAULT NULL,
   `Sensor` int(11) NOT NULL,
   `Leitura` decimal(6,2) NOT NULL,
-  `TipoAlerta` int(11) NOT NULL,
+  `TipoAlerta` varchar(55) NOT NULL,
   `Msg` varchar(100) NOT NULL,
   `HoraEscrita` timestamp NULL DEFAULT current_timestamp(),
   `IDJogo` int(11) NOT NULL
@@ -500,7 +501,7 @@ CREATE TABLE `setupmaze` (
 
 INSERT INTO `setupmaze` (`normalnoise`, `numberrooms`, `numbermarsamis`, `numberplayers`, `noisevartoleration`, `ID`, `last_updated`) VALUES
 (19.00, 10, 30, 40, 2.50, 0, '0000-00-00 00:00:00'),
-(19.00, 10, 30, 40, 2.50, 1, '2025-05-03 16:49:34');
+(19.00, 10, 30, 40, 2.50, 1, '2025-05-05 00:34:04');
 
 --
 -- Acionadores `setupmaze`
@@ -596,25 +597,6 @@ CREATE TABLE `sound` (
 -- --------------------------------------------------------
 
 --
--- Estrutura da tabela `tipoalerta`
---
-
-CREATE TABLE `tipoalerta` (
-  `IDTipoAlerta` int(11) NOT NULL,
-  `TipoAlerta` varchar(50) NOT NULL,
-  `gravidade` varchar(50) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Extraindo dados da tabela `tipoalerta`
---
-
-INSERT INTO `tipoalerta` (`IDTipoAlerta`, `TipoAlerta`, `gravidade`) VALUES
-(1, 'Warring', 'High');
-
--- --------------------------------------------------------
-
---
 -- Estrutura da tabela `utilizador`
 --
 
@@ -670,8 +652,7 @@ ALTER TABLE `medicoespassagens`
 --
 ALTER TABLE `mensagens`
   ADD PRIMARY KEY (`ID`),
-  ADD KEY `chaveestrageira3` (`IDJogo`),
-  ADD KEY `idtipoalerta` (`TipoAlerta`);
+  ADD KEY `chaveestrageira3` (`IDJogo`);
 
 --
 -- Índices para tabela `ocupacaolabirinto`
@@ -692,12 +673,6 @@ ALTER TABLE `setupmaze`
 ALTER TABLE `sound`
   ADD PRIMARY KEY (`IDSound`),
   ADD KEY `chaveestrageira2` (`IdJogo`);
-
---
--- Índices para tabela `tipoalerta`
---
-ALTER TABLE `tipoalerta`
-  ADD PRIMARY KEY (`IDTipoAlerta`);
 
 --
 -- Índices para tabela `utilizador`
@@ -725,7 +700,7 @@ ALTER TABLE `jogo`
 -- AUTO_INCREMENT de tabela `mensagens`
 --
 ALTER TABLE `mensagens`
-  MODIFY `ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+  MODIFY `ID` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- Restrições para despejos de tabelas
@@ -747,8 +722,7 @@ ALTER TABLE `medicoespassagens`
 -- Limitadores para a tabela `mensagens`
 --
 ALTER TABLE `mensagens`
-  ADD CONSTRAINT `chaveestrageira3` FOREIGN KEY (`IDJogo`) REFERENCES `jogo` (`IDJogo`) ON DELETE CASCADE ON UPDATE CASCADE,
-  ADD CONSTRAINT `idtipoalerta` FOREIGN KEY (`TipoAlerta`) REFERENCES `tipoalerta` (`IDTipoAlerta`) ON UPDATE CASCADE;
+  ADD CONSTRAINT `chaveestrageira3` FOREIGN KEY (`IDJogo`) REFERENCES `jogo` (`IDJogo`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
 -- Limitadores para a tabela `ocupacaolabirinto`
