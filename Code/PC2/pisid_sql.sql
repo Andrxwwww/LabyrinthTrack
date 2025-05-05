@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Tempo de geração: 05-Maio-2025 às 02:36
+-- Tempo de geração: 05-Maio-2025 às 17:13
 -- Versão do servidor: 10.4.32-MariaDB
 -- versão do PHP: 8.2.12
 
@@ -381,16 +381,17 @@ CREATE TABLE `jogo` (
   `jogador` varchar(50) NOT NULL,
   `DataHorainicio` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `Estado` enum('pending','running','finished') NOT NULL DEFAULT 'pending',
-  `Score` double NOT NULL DEFAULT -1
+  `Score` double NOT NULL DEFAULT -1,
+  `spamTol` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Extraindo dados da tabela `jogo`
 --
 
-INSERT INTO `jogo` (`IDJogo`, `Descricao`, `jogador`, `DataHorainicio`, `Estado`, `Score`) VALUES
-(1, 'New game description', 'johndoe@example.com', '2025-05-02 18:09:22', 'running', 100),
-(3, 'teste', 'player1@example.com', '2025-05-01 11:26:07', 'pending', -1);
+INSERT INTO `jogo` (`IDJogo`, `Descricao`, `jogador`, `DataHorainicio`, `Estado`, `Score`, `spamTol`) VALUES
+(1, 'New game description', 'johndoe@example.com', '2025-05-05 13:41:22', 'running', 100, 3),
+(3, 'teste', 'player1@example.com', '2025-05-01 11:26:07', 'pending', -1, 0);
 
 -- --------------------------------------------------------
 
@@ -465,6 +466,46 @@ CREATE TABLE `mensagens` (
   `IDJogo` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Acionadores `mensagens`
+--
+DELIMITER $$
+CREATE TRIGGER `before_insert_mensagens_spam_check` BEFORE INSERT ON `mensagens` FOR EACH ROW BEGIN
+    DECLARE ultima_hora_escrita TIMESTAMP;
+    DECLARE ultimo_sensor INT;
+    DECLARE spam_tol INT;
+    DECLARE diferenca_segundos INT;
+
+    -- Obter a HoraEscrita e Sensor do último registro inserido em mensagens
+    SELECT HoraEscrita, Sensor INTO ultima_hora_escrita, ultimo_sensor
+    FROM mensagens
+    ORDER BY HoraEscrita DESC
+    LIMIT 1;
+
+    -- Obter o valor de spamTol da tabela jogo para o IdJogo do novo registro
+    SELECT spamTol INTO spam_tol
+    FROM jogo
+    WHERE IDJogo = NEW.IdJogo;
+
+    -- Se spamTol for <= 0, ignorar a verificação
+    IF spam_tol IS NULL OR spam_tol <= 0 THEN
+        SET diferenca_segundos = NULL; -- Permitir inserção
+    ELSEIF ultima_hora_escrita IS NULL THEN
+        SET diferenca_segundos = NULL; -- Permitir inserção (não há registros anteriores)
+    ELSE
+        -- Calcular a diferença em segundos entre a nova HoraEscrita e a última HoraEscrita
+        SET diferenca_segundos = TIMESTAMPDIFF(SECOND, ultima_hora_escrita, NEW.HoraEscrita);
+    END IF;
+
+    -- Se a diferença for menor que spamTol e o Sensor for igual ao último, descartar a inserção
+    IF diferenca_segundos IS NOT NULL AND diferenca_segundos < spam_tol AND NEW.Sensor = ultimo_sensor THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Inserção descartada: Tempo entre mensagens menor que spamTol e Sensor igual ao último registro.';
+    END IF;
+END
+$$
+DELIMITER ;
+
 -- --------------------------------------------------------
 
 --
@@ -478,6 +519,22 @@ CREATE TABLE `ocupacaolabirinto` (
   `Sala` int(11) NOT NULL,
   `Tentativas` int(11) NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Extraindo dados da tabela `ocupacaolabirinto`
+--
+
+INSERT INTO `ocupacaolabirinto` (`IDJogo`, `NumeroMarsamisOdd`, `NumeroMarsamisEven`, `Sala`, `Tentativas`) VALUES
+(1, 0, 0, 1, 0),
+(1, 0, 0, 2, 0),
+(1, 0, 0, 3, 0),
+(1, 0, 0, 4, 0),
+(1, 0, 0, 5, 0),
+(1, 0, 0, 6, 0),
+(1, 0, 0, 7, 0),
+(1, 0, 0, 8, 0),
+(1, 0, 0, 9, 0),
+(1, 0, 0, 10, 0);
 
 -- --------------------------------------------------------
 
@@ -501,7 +558,7 @@ CREATE TABLE `setupmaze` (
 
 INSERT INTO `setupmaze` (`normalnoise`, `numberrooms`, `numbermarsamis`, `numberplayers`, `noisevartoleration`, `ID`, `last_updated`) VALUES
 (19.00, 10, 30, 40, 2.50, 0, '0000-00-00 00:00:00'),
-(19.00, 10, 30, 40, 2.50, 1, '2025-05-05 00:34:04');
+(19.00, 10, 30, 40, 2.50, 1, '2025-05-05 15:12:01');
 
 --
 -- Acionadores `setupmaze`
