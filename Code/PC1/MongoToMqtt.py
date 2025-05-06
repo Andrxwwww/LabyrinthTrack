@@ -15,10 +15,14 @@ keep_alive_lock = threading.Lock()
 
 
 # Cliente MQTT
-print("[MongoDB->MQTT] Conectando ao broker MQTT...")
-client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
-client.connect(MQTT_BROKER, MQTT_PORT, 60)
-print("[MongoDB->MQTT] Conectado ao broker MQTT..." + MQTT_BROKER)
+try:
+    print("[MongoDB->MQTT] Conectando ao broker MQTT...")
+    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    client.connect(MQTT_BROKER, MQTT_PORT, 60)
+    print("[MongoDB->MQTT] Conectado ao broker MQTT..." + MQTT_BROKER)
+except Exception as e:
+    print(f"[MongoDB->MQTT] Erro ao conectar ao broker MQTT: {e}")
+    exit(1)
 
 # Handler para ACKs recebidos
 def on_message_ack(client, userdata, msg):
@@ -80,11 +84,16 @@ def on_message(client, userdata, msg):
     else:
         print(f"[MongoDB->MQTT] Mensagem recebida num tópico não tratado: {msg.topic}")
 
+# Configurar callbacks e tópicos
 client.on_message = on_message
-client.subscribe(GROUP_MQTT_FAILED_TOPIC, qos=2)
-client.subscribe(GROUP_MQTT_ACK_TOPIC, qos=2)
-client.subscribe(GROUP_MQTT_Alive_TOPIC, qos=1)
-client.loop_start()
+try:
+    client.subscribe(GROUP_MQTT_FAILED_TOPIC, qos=2)
+    client.subscribe(GROUP_MQTT_ACK_TOPIC, qos=2)
+    client.subscribe(GROUP_MQTT_Alive_TOPIC, qos=1)
+    client.loop_start()
+except Exception as e:
+    print(f"[MongoDB->MQTT] Erro ao subscrever tópicos: {e}")
+    exit(1)
 
 
 # Publicar apenas documentos que ainda não foram migrados

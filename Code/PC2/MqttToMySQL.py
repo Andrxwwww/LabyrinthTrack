@@ -1,3 +1,4 @@
+import os
 from datetime import datetime, timedelta
 import paho.mqtt.client as mqtt
 import json
@@ -389,15 +390,19 @@ def reconnect_db():
 # Configuração do cliente MQTT
 def start_mqtt_client():
     global client_mqtt
-    client_mqtt = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
-    client_mqtt.on_message = on_message
-    client_mqtt.connect(MQTT_BROKER, MQTT_PORT, 60)
-    client_mqtt.subscribe([
-        (GROUP_MQTT_SOUND_TOPIC, 2),
-        (GROUP_MQTT_MOVE_TOPIC, 2)
-    ])
-    print("[MQTT] Conectado e inscrito em todos os tópicos")
-    client_mqtt.loop_forever()
+    try:
+        client_mqtt = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+        client_mqtt.on_message = on_message
+        client_mqtt.connect(MQTT_BROKER, MQTT_PORT, 60)
+        client_mqtt.subscribe([
+            (GROUP_MQTT_SOUND_TOPIC, 2),
+            (GROUP_MQTT_MOVE_TOPIC, 2)
+        ])
+        print("[MQTT] Conectado e inscrito em todos os tópicos")
+        client_mqtt.loop_forever()
+    except Exception as e:
+        print(f"[MQTT->MySQL] Erro ao iniciar cliente MQTT: {e}")
+        os._exit(1)
 
 
 if __name__ == "__main__":

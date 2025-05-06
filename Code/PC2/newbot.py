@@ -1,4 +1,6 @@
+import sys
 import time
+from datetime import datetime, timedelta
 import mariadb
 import threading
 import paho.mqtt.client as mqtt
@@ -11,27 +13,38 @@ IMBALANCE_THRESHOLD = 1  # Reduzido para permitir mais movimento
 CHECK_INTERVAL = 0.1   # Aumentado para evitar sobrecarga
 
 import MySQLToMySQL
-MySQLToMySQL.main()
+try:
+    MySQLToMySQL.main()
+except Exception as e:
+    print(f"Erro ao executar MySQLToMySQL.main(): {e}")
 
 # Estruturas de estado
 door_states = {}  # {(origin, destiny): is_open}
 trigger_count = {}  # {room_id: count}
 
 # Cliente MQTT
-mqtt_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
-mqtt_client.connect(MQTT_BROKER, 1883, 60)
-mqtt_client.loop_start()
+try:
+    mqtt_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    mqtt_client.connect(MQTT_BROKER, 1883, 60)
+    mqtt_client.loop_start()
+except Exception as e:
+    print(f"Erro ao configurar MQTT: {e}")
+    sys.exit(1)
 
 # ================================================
 # Funções do Banco de Dados e Inicialização
 # ================================================
 def get_db_connection():
-    return mariadb.connect(
-        host="127.0.0.1",
-        user="root",
-        password="",
-        database="pisid_sql"
-    )
+    try:
+        return mariadb.connect(
+            host="127.0.0.1",
+            user="root",
+            password="",
+            database="pisid_sql"
+        )
+    except mariadb.Error as e:
+        print(f"Erro ao conectar com o banco de dados: {e}")
+        sys.exit(1)
 
 def initialize_door_states():
     """Carrega conexões do banco e inicializa todas como abertas"""
@@ -139,6 +152,59 @@ def check_score_triggers():
         except Exception as e:
             print(f"Erro na verificação de pontuação: {e}")
 
+#Logica para fechar todas as portas
+def handle_close_all_doors():
+    """
+    Thread que fica verificando a tabela `mensagens` a cada 1s
+    e, ao achar um alerta Limite 90% recente, fecha/abre todas
+    as portas e encerra-se.
+    """
+    try:
+        while True:
+            db = get_db_connection()
+            cursor = db.cursor()
+            cursor.execute(
+                "SELECT ID, HoraEscrita "
+                "FROM mensagens "
+                "WHERE TipoAlerta = %s "
+                "ORDER BY ID DESC LIMIT 1",
+                ("Limite 80%",)
+            )
+            row = cursor.fetchone()
+            cursor.close()
+            db.close()
+
+            if row:
+                msg_id, hora_escrita = row
+                # converte se vier string
+                if isinstance(hora_escrita, str):
+                    hora = datetime.strptime(hora_escrita, "%Y-%m-%d %H:%M:%S")
+                else:
+                    hora = hora_escrita
+
+                # se tiver até 10s de vida, dispara ação
+                if datetime.now() - hora <= timedelta(seconds=10):
+                    # 1) fecha todas as portas
+                    close_msg = f'{{Type: CloseAllDoor, Player: {PLAYER_ID}}}'
+                    mqtt_client.publish(MQTT_TOPIC, close_msg)
+                    print(f"[CloseAllDoor] enviado em resposta ao alerta ID {msg_id}")
+
+                    # 2) espera 5 s
+                    time.sleep(10)
+
+                    # 3) abre todas as portas
+                    open_msg = f'{{Type: OpenAllDoor, Player: {PLAYER_ID}}}'
+                    mqtt_client.publish(MQTT_TOPIC, open_msg)
+                    print("[OpenAllDoor] enviado após 5 s")
+
+                    break  # sai do loop e encerra a thread
+
+            # se não achou alertas ou não são recentes, espera antes de tentar de novo
+            time.sleep(0.5)
+
+    except Exception as e:
+        print(f"[CloseAllThread] Erro ao processar alerta 'Limite 90%': {e}")
+
 # ================================================
 # Funções de Controle de Portas
 # ================================================
@@ -165,6 +231,10 @@ if __name__ == "__main__":
     score_thread = threading.Thread(target=check_score_triggers, daemon=True)
     door_thread.start()
     score_thread.start()
+
+    # Se quiseres começar também a thread de CloseAll, descomenta
+    close_all_thread = threading.Thread(target=handle_close_all_doors, daemon=True)
+    close_all_thread.start()
 
     try:
         while True:

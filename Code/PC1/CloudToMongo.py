@@ -1,3 +1,4 @@
+import os
 import threading
 import paho.mqtt.client as mqtt
 import time
@@ -7,7 +8,7 @@ from MongoConfigs import *
 # from Validations_PC1 import check_duplicate_msgs
 
 #Broker novo:
-# > mazerun 15 1 1 98.66.160.46 1883
+# > mazerun 15 1 1 20.39.241.21 1883
 
 # Limpar todas as coleções **REMOVER DEPOIS**
 collection_move.delete_many({})
@@ -91,8 +92,12 @@ def mqtt_subscriber(topic , num_qos):
     print(f"1. [Cloud->MongoDB] A subscrever ao tópico {topic}...")
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     client.on_message = on_message
-    client.connect(MQTT_BROKER, MQTT_PORT, 60)
-    print("Conectado ao Broker "+ MQTT_BROKER)
+    try:
+        client.connect(MQTT_BROKER, MQTT_PORT, 60)
+        print("Conectado ao Broker "+ MQTT_BROKER)
+    except Exception as e:
+        print(f"[Erro] Falha na conexão ao broker MQTT ({MQTT_BROKER}:{MQTT_PORT}) -> {e}")
+        os._exit(1)
     client.subscribe(topic, qos=num_qos)
     print(f"2. [Cloud->MongoDB] Subscrito ao tópico {topic}, aguardando mensagens...")
     client.loop_forever()
