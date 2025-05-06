@@ -41,7 +41,7 @@ except mariadb.Error as e:
 # ---------------------------------------------------------------------
 # Configuração do MQTT (não requer try...catch, são variáveis estáticas)
 # ---------------------------------------------------------------------
-MQTT_BROKER ="98.66.160.46"
+MQTT_BROKER ="20.39.241.21"
 MQTT_PORT = 1883
 GROUP_MQTT_SOUND_TOPIC = "sound_grupo15"
 GROUP_MQTT_MOVE_TOPIC = "move_grupo15"

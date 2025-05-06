@@ -19,10 +19,10 @@ message_received = 0
 lock = threading.Lock()  # Lock para garantir que a variável message_count é atualizada corretamente
 
 # Inicializar documento dos last IDs se não existir
-collection_lastids.replace_one({}, {
-    "LastIDMove": 0,
-    "LastIDSound": 0
-}, upsert=True)
+# collection_lastids.replace_one({}, {
+#     "LastIDMove": 0,
+#     "LastIDSound": 0
+# }, upsert=True)
 
 # Ler os valores atuais
 doc_last_ids = collection_lastids.find_one({})
@@ -92,6 +92,7 @@ def mqtt_subscriber(topic , num_qos):
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     client.on_message = on_message
     client.connect(MQTT_BROKER, MQTT_PORT, 60)
+    print("Conectado ao Broker "+ MQTT_BROKER)
     client.subscribe(topic, qos=num_qos)
     print(f"2. [Cloud->MongoDB] Subscrito ao tópico {topic}, aguardando mensagens...")
     client.loop_forever()

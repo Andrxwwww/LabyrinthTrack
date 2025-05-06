@@ -5,7 +5,7 @@ import threading
 import paho.mqtt.client as mqtt
 
 # Configurações ajustadas para match com o primeiro código
-MQTT_BROKER = "98.66.160.46"  # Broker do labirinto
+MQTT_BROKER = "20.39.241.21"  # Broker do labirinto
 MQTT_TOPIC = "pisid_mazeact"  # Tópico corrigido
 PLAYER_ID = 15
 

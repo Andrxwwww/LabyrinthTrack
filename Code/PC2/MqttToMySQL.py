@@ -336,6 +336,7 @@ def get_idjogo_atual():
 def keep_alive_sender():
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     client.connect(MQTT_BROKER, MQTT_PORT, 60)
+    print("Conectado ao MQTT "+ MQTT_BROKER)
     client.loop_start()
 
     while True:

@@ -4,11 +4,14 @@ import threading
 import paho.mqtt.client as mqtt
 
 # Configurações
-MQTT_BROKER = "98.66.160.46"
+MQTT_BROKER = "20.39.241.21"
 MQTT_TOPIC = "pisid_mazeact"
 PLAYER_ID = 15
 IMBALANCE_THRESHOLD = 1  # Reduzido para permitir mais movimento
 CHECK_INTERVAL = 0.1   # Aumentado para evitar sobrecarga
+
+import MySQLToMySQL
+MySQLToMySQL.main()
 
 # Estruturas de estado
 door_states = {}  # {(origin, destiny): is_open}
@@ -76,7 +79,7 @@ def control_individual_doors():
                 available_connections = [(dest, is_open) for (orig, dest), is_open in door_states.items() if orig == room_id]
 
                 # Limite dinâmico para salas pequenas
-                dynamic_threshold = max(1, total_marsamis // 4)
+                dynamic_threshold = max(1, total_marsamis +3 // 4)
 
                 if abs(imbalance) > dynamic_threshold:
                     needed_type = "even" if imbalance > 0 else "odd"
@@ -119,7 +122,7 @@ def check_score_triggers():
                 even = state["even"]
 
                 # Condições para disparar o Score
-                if odd == even and (odd + even) >= 2:
+                if odd == even and (odd + even) > 2:
                     if room_id not in trigger_count:
                         trigger_count[room_id] = 0
 
@@ -132,7 +135,7 @@ def check_score_triggers():
                         if trigger_count[room_id] == 3:
                             print(f"⚠️ Sala {room_id} atingiu o limite de 3 triggers!")
 
-            time.sleep(0.02)  # Verificar a cada 5 segundos
+            time.sleep(2)  # Verificar a cada 5 segundos
         except Exception as e:
             print(f"Erro na verificação de pontuação: {e}")
 
