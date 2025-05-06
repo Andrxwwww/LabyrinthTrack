@@ -2,18 +2,17 @@ import paho.mqtt.client as mqtt
 import json
 import time
 import threading
-import signal
-from datetime import datetime, timedelta
+
 
 from MongoConfigs import *
 from Validations_PC1 import *
 
-# Variável global para controle de execução
-running = True
+#Keep_alive
+from datetime import datetime, timedelta
 
-# Keep_alive
 last_keep_alive = datetime.now()
 keep_alive_lock = threading.Lock()
+
 
 # Cliente MQTT
 try:
@@ -25,14 +24,7 @@ except Exception as e:
     print(f"[MongoDB->MQTT] Erro ao conectar ao broker MQTT: {e}")
     exit(1)
 
-
-def signal_handler(sig, frame):
-    global running
-    print("\n[INFO] Ctrl+C pressionado. Encerrando...")
-    running = False
-
-
-# Handler para ACKs recebidos (mantido igual)
+# Handler para ACKs recebidos
 def on_message_ack(client, userdata, msg):
     try:
         dados = json.loads(msg.payload.decode())
@@ -61,22 +53,22 @@ def on_message_failed(client, userdata, msg):
         dados = json.loads(msg.payload.decode())
         print(f"[MongoDB->MQTT] Mensagem recebida no tópico FAILED: {dados}")
 
+
         if dados.get("Collection") == "Sound":
-            collection_sound.update_one({"IDSound": dados.get("IDMessage")}, {"$set": {"IsMigrated": True}})
+            collection_sound.update_one({"IDSound": dados.get("IDMessage") }, {"$set": {"IsMigrated": True}})
             collection_failed.insert_one(dados)
-            # collection_sound.delete_one({"IDSound": dados.get("IDMessage")})
+            #collection_sound.delete_one({"IDSound": dados.get("IDMessage")})
         elif dados.get("Collection") == "Move":
             collection_move.update_one({"IDMove": dados.get("IDMessage")}, {"$set": {"IsMigrated": True}})
             collection_failed.insert_one(dados)
-            # collection_move.delete_one({"IDMove": IDMessage})
+            #collection_move.delete_one({"IDMove": IDMessage})
 
         print(f"A COLECAO É: {dados.get('Collection')}")
         print(f"[MongoDB->MQTT] Documento inserido na coleção 'Failed'")
-
+        
     except Exception as e:
         print(f"[MongoDB->MQTT] Erro ao processar mensagem do tópico FAILED: {e}")
 
-# ... (código original mantido)
 
 def on_message(client, userdata, msg):
     global last_keep_alive
@@ -92,9 +84,7 @@ def on_message(client, userdata, msg):
     else:
         print(f"[MongoDB->MQTT] Mensagem recebida num tópico não tratado: {msg.topic}")
 
-
-
-# Configurar callbacks e tópicos (mantido igual)
+# Configurar callbacks e tópicos
 client.on_message = on_message
 try:
     client.subscribe(GROUP_MQTT_FAILED_TOPIC, qos=2)
@@ -106,51 +96,80 @@ except Exception as e:
     exit(1)
 
 
+# Publicar apenas documentos que ainda não foram migrados
 def publish_data(collection, mqtt_topic):
-    global running
     print(f"[MongoDB->MQTT] A iniciar publicação contínua para o tópico {mqtt_topic}...")
-
-    while running:  # Agora verifica a variável global 'running'
+    #Verifica se o MySql esta a enviar msg
+    while True:
         with keep_alive_lock:
             tempo_desde_ultimo_keep_alive = datetime.now() - last_keep_alive
 
         if tempo_desde_ultimo_keep_alive > timedelta(seconds=3):
             print(f"[MongoDB->MQTT] Sem keep alive há {tempo_desde_ultimo_keep_alive.seconds}s. Publicação pausada.")
+            print(f"Último keep-alive recebido em: {last_keep_alive}")
             time.sleep(2)
             continue
-
         documentos_encontrados = False
         for documento in collection.find({"IsMigrated": {"$ne": True}}):
-            if not running:  # Sai imediatamente se 'running' for False
-                return
+            # Se a publicação foi pausada (sem keep alive), interrompe o loop de documentos
+            with keep_alive_lock:
+                tempo_desde_ultimo_keep_alive = datetime.now() - last_keep_alive
+            if tempo_desde_ultimo_keep_alive > timedelta(seconds=3):
+                print("[MongoDB->MQTT] Sem keep alive, interrompendo publicação de documentos.")
+                break  # Sai do loop `for` e volta a verificar o keep_alive
 
-            # ... (restante do código original mantido)
+            documentos_encontrados = True
+            mensagem = documento.copy()
+
+            if mqtt_topic == GROUP_MQTT_MOVE_TOPIC:
+                if validar_movimento(documento):
+                    mensagem_json = json.dumps(mensagem, default=str)
+                    print(f"[MongoDB->MQTT] Publicado Move (VALIDADO): {mensagem_json}")
+                    client.publish(mqtt_topic, mensagem_json)
+                else:
+                    collection_move.update_one({"IDMove": documento.get("IDMove")}, {"$set": {"IsMigrated": True}})
+                    collection_failed.insert_one(convert_data_for_failedCollection(documento,"2.[Mongo->MQTT] Movimento Invalido","Move"))  # Guardar na coleção Failed
+                    print(f"[MongoDB->MQTT] Documento Move (INVÁLIDO) guardado em 'Failed': {documento}")
+
+            elif mqtt_topic == GROUP_MQTT_SOUND_TOPIC:
+                if validar_sound(documento):
+                    mensagem_json = json.dumps(mensagem, default=str)
+                    print(f"[MongoDB->MQTT] Publicado Sound (VALIDADO): {mensagem_json}")
+                    client.publish(mqtt_topic, mensagem_json)
+                else:
+                    collection_sound.update_one({"IDSound": documento.get("IDSound")}, {"$set": {"IsMigrated": True}})
+                    collection_failed.insert_one(convert_data_for_failedCollection(documento,"3.[Mongo->MQTT] Som Invalido","Sound"))
+                    print(f"[MongoDB->MQTT] Documento Sound (INVÁLIDO) guardado em 'Failed': {documento}")
+
+            else:
+                print(f"[MongoDB->MQTT] Tópico desconhecido: {mqtt_topic}")
+
+            time.sleep(0.01)
 
         if not documentos_encontrados:
-            print(f"[MongoDB->MQTT] Nenhum novo documento.")
-        time.sleep(0.5)
+            print(f"[MongoDB->MQTT] Nenhum novo documento .")
+
+        time.sleep(0.5)  # Espera antes da próxima verificação
 
 
+# Início da aplicação
 if __name__ == "__main__":
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
-
     thread_move = threading.Thread(target=publish_data, args=(collection_move, GROUP_MQTT_MOVE_TOPIC))
     thread_sound = threading.Thread(target=publish_data, args=(collection_sound, GROUP_MQTT_SOUND_TOPIC))
 
     thread_move.start()
     thread_sound.start()
 
-    try:
-        while running:  # Mantém o programa ativo enquanto 'running' for True
-            time.sleep(0.5)
-    except Exception as e:
-        print(f"[ERRO] {e}")
-    finally:
-        print("[MongoDB->MQTT] Finalizando threads...")
-        running = False
-        thread_move.join(timeout=2)
-        thread_sound.join(timeout=2)
-        client.loop_stop()
-        client.disconnect()
-        print("[MongoDB->MQTT] Finalizado.")
+    thread_move.join()
+    thread_sound.join()
+
+    client.loop_stop()
+    client.disconnect()
+    print("[MongoDB->MQTT] Finalizado.")
+
+# dar update de true para false pelo mongocompass
+#{
+#  "$set": {
+#    "IsMigrated": false
+#  }
+#}
