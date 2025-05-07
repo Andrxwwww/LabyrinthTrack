@@ -3,13 +3,12 @@ import threading
 import paho.mqtt.client as mqtt
 import time
 from datetime import datetime
-import signal
 
 from MongoConfigs import *
+# from Validations_PC1 import check_duplicate_msgs
 
 #Broker novo:
 # > mazerun 15 1 1 20.39.241.21 1883
-
 
 # Limpar todas as coleções **REMOVER DEPOIS**
 collection_move.delete_many({})
@@ -18,30 +17,44 @@ collection_failed.delete_many({})
 
 # Contador de mensagens recebidas
 message_received = 0
-lock = threading.Lock()
-running = True  # Variável de controle para encerramento
+lock = threading.Lock()  # Lock para garantir que a variável message_count é atualizada corretamente
 
 # Inicializar documento dos last IDs se não existir
+# collection_lastids.replace_one({}, {
+#     "LastIDMove": 0,
+#     "LastIDSound": 0
+# }, upsert=True)
+
+# Ler os valores atuais
 doc_last_ids = collection_lastids.find_one({})
-last_move_id = doc_last_ids.get("LastIDMove", 0)
-last_sound_id = doc_last_ids.get("LastIDSound", 0)
+
+# Variáveis globais com os IDs
+last_move_id = doc_last_ids.get("LastIDMove")
+last_sound_id = doc_last_ids.get("LastIDSound")
 
 
+# Função para obter o timestamp atual
 def get_current_timestamp():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
 
-
+# Callback quando recebe uma mensagem
 def on_message(client, userdata, msg):
     global message_received, last_move_id, last_sound_id
     payload = msg.payload.decode("utf-8")
     print("[Cloud->MongoDB] Mensagem recebida:", payload)
 
-    payload = payload.strip("{}")
+    # Remover os caracteres '{' e '}' do início e do final do payload
+    payload = payload.strip("{")
+    payload = payload.strip("}")
 
+    # Atualizar contador de mensagens recebidas
     with lock:
         message_received += 1
 
+    # Processar a mensagem conforme o tópico
     if msg.topic == MQTT_MOVE_TOPIC:
+        # Exemplo de payload: "Player:15, Marsami:24, RoomOrigin:8, RoomDestiny:9, Status:1"
+
         fields = payload.split(", ")
         message = {}
         last_move_id += 1
@@ -54,9 +67,12 @@ def on_message(client, userdata, msg):
         message["Hora"] = get_current_timestamp()
         collection_lastids.update_one({}, {"$set": {"LastIDMove": last_move_id}})
 
+        # Inserir no MongoDB
         collection_move.insert_one(message)
         print("[Cloud->MongoDB] Inserido no MongoDB:", message)
     elif msg.topic == MQTT_SOUND_TOPIC:
+        # Exemplo de payload: "Player:15, Hour:2025-03-07 21:04:29.193352, Sound:19.2"
+
         fields = payload.split(", ")
         message = {}
         last_sound_id += 1
@@ -67,69 +83,53 @@ def on_message(client, userdata, msg):
         message["IsMigrated"] = False
         collection_lastids.update_one({}, {"$set": {"LastIDSound": last_sound_id}})
 
+        # Inserir no MongoDB
         collection_sound.insert_one(message)
         print("[Cloud->MongoDB] Inserido no MongoDB:", message)
 
-
-def mqtt_subscriber(topic, num_qos):
+# Função para subscrever a um tópico MQTT
+def mqtt_subscriber(topic , num_qos):
+    print(f"1. [Cloud->MongoDB] A subscrever ao tópico {topic}...")
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     client.on_message = on_message
     try:
         client.connect(MQTT_BROKER, MQTT_PORT, 60)
-        print(f"Conectado ao Broker {MQTT_BROKER} no tópico {topic}")
+        print("Conectado ao Broker "+ MQTT_BROKER)
     except Exception as e:
-        print(f"[Erro] Conexão ao broker falhou -> {e}")
-        return
+        print(f"[Erro] Falha na conexão ao broker MQTT ({MQTT_BROKER}:{MQTT_PORT}) -> {e}")
+        os._exit(1)
     client.subscribe(topic, qos=num_qos)
-    client.loop_start()  # Inicia o loop em background
-    print(f"Subscrito ao tópico {topic}, aguardando mensagens...")
+    print(f"2. [Cloud->MongoDB] Subscrito ao tópico {topic}, aguardando mensagens...")
+    client.loop_forever()
 
-    global running
-    while running:
-        time.sleep(0.1)  # Mantém a thread ativa verificando a variável 'running'
-
-    client.loop_stop()
-    client.disconnect()
-    print(f"Desconectado do tópico {topic}")
-
-
+# Funcao para verificar se as mensagens foram recebidas
 def check_messages_received():
-    while running:
-        time.sleep(10)
+    while True:
+        time.sleep(10)  # Verificar a cada 10 segundos
+
         with lock:
             received_count = message_received
+
         mongo_count_move = collection_move.count_documents({})
         mongo_count_sound = collection_sound.count_documents({})
         total_count = mongo_count_move + mongo_count_sound
-        print(
-            f"Mensagens recebidas: {received_count} | MongoDB: {total_count} (Move: {mongo_count_move}, Sound: {mongo_count_sound})")
-
-
-def signal_handler(sig, frame):
-    global running
-    print("\n[INFO] Ctrl+C pressionado. Encerrando...")
-    running = False
-
+        print(f"Mensagens recebidas: {received_count} | Mensagens no MongoDB: {total_count} | Move: {mongo_count_move} | Sound: {mongo_count_sound}")
 
 if __name__ == "__main__":
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
-
     try:
-        mqtt_thread_move = threading.Thread(target=mqtt_subscriber, args=(MQTT_MOVE_TOPIC, 2))
-        mqtt_thread_sound = threading.Thread(target=mqtt_subscriber, args=(MQTT_SOUND_TOPIC, 1))
-        check_thread = threading.Thread(target=check_messages_received)
+        # Iniciar threads
+        mqtt_thread_move = threading.Thread(target=mqtt_subscriber, args=(MQTT_MOVE_TOPIC,2), daemon=True)
+        mqtt_thread_sound = threading.Thread(target=mqtt_subscriber, args=(MQTT_SOUND_TOPIC,1), daemon=True)
+        check_thread = threading.Thread(target=check_messages_received, daemon=True)  # For debugging
 
         mqtt_thread_move.start()
         mqtt_thread_sound.start()
         check_thread.start()
 
-        # Esperar até que todas as threads terminem
-        while mqtt_thread_move.is_alive() or mqtt_thread_sound.is_alive() or check_thread.is_alive():
-            time.sleep(0.5)
+        # Esperar que as threads terminem  [ Não vão terminar por causa do loop_forever() ]
+        mqtt_thread_move.join()
+        mqtt_thread_sound.join()
+        check_thread.join()
 
-    except Exception as e:
-        print(f"[Erro] {e}")
-    finally:
-        running = False
-        print("Programa encerrado.")
+    except KeyboardInterrupt:
+        print("\n[INFO] Interrupção recebida. Encerrando o programa...")
