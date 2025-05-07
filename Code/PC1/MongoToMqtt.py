@@ -110,10 +110,11 @@ def publish_data(collection, mqtt_topic):
     global running
     print(f"[MongoDB->MQTT] A iniciar publicação contínua para o tópico {mqtt_topic}...")
 
-    while running:  # Agora verifica a variável global 'running'
+    while running:  # Loop principal controlado por 'running'
         with keep_alive_lock:
             tempo_desde_ultimo_keep_alive = datetime.now() - last_keep_alive
 
+        # Verifica se o keep-alive está ativo
         if tempo_desde_ultimo_keep_alive > timedelta(seconds=3):
             print(f"[MongoDB->MQTT] Sem keep alive há {tempo_desde_ultimo_keep_alive.seconds}s. Publicação pausada.")
             time.sleep(2)
@@ -121,14 +122,64 @@ def publish_data(collection, mqtt_topic):
 
         documentos_encontrados = False
         for documento in collection.find({"IsMigrated": {"$ne": True}}):
-            if not running:  # Sai imediatamente se 'running' for False
-                return
+            # Verificação dupla: running e keep-alive
+            if not running:
+                return  # Encerra a thread imediatamente
 
-            # ... (restante do código original mantido)
+            # Verifica novamente o keep-alive durante o processamento
+            with keep_alive_lock:
+                tempo_desde_ultimo_keep_alive = datetime.now() - last_keep_alive
+            if tempo_desde_ultimo_keep_alive > timedelta(seconds=3):
+                print("[MongoDB->MQTT] Keep-alive expirado durante o processamento!")
+                break  # Sai do loop de documentos
+
+            # Processamento do documento (mantido do código antigo)
+            documentos_encontrados = True
+            mensagem = documento.copy()
+
+            try:
+                if mqtt_topic == GROUP_MQTT_MOVE_TOPIC:
+                    if validar_movimento(documento):
+                        mensagem_json = json.dumps(mensagem, default=str)
+                        print(f"[MongoDB->MQTT] Publicado Move (VALIDADO): {mensagem_json}")
+                        client.publish(mqtt_topic, mensagem_json, qos=1)  # Adicionado QoS
+                    else:
+                        collection_move.update_one(
+                            {"IDMove": documento.get("IDMove")},
+                            {"$set": {"IsMigrated": True}}
+                        )
+                        collection_failed.insert_one(
+                            convert_data_for_failedCollection(documento, "2.[Mongo->MQTT] Movimento Invalido", "Move")
+                        )
+                        print(f"[MongoDB->MQTT] Documento Move (INVÁLIDO) guardado em 'Failed': {documento}")
+
+                elif mqtt_topic == GROUP_MQTT_SOUND_TOPIC:
+                    if validar_sound(documento):
+                        mensagem_json = json.dumps(mensagem, default=str)
+                        print(f"[MongoDB->MQTT] Publicado Sound (VALIDADO): {mensagem_json}")
+                        client.publish(mqtt_topic, mensagem_json, qos=1)  # Adicionado QoS
+                    else:
+                        collection_sound.update_one(
+                            {"IDSound": documento.get("IDSound")},
+                            {"$set": {"IsMigrated": True}}
+                        )
+                        collection_failed.insert_one(
+                            convert_data_for_failedCollection(documento, "3.[Mongo->MQTT] Som Invalido", "Sound")
+                        )
+                        print(f"[MongoDB->MQTT] Documento Sound (INVÁLIDO) guardado em 'Failed': {documento}")
+
+                else:
+                    print(f"[MongoDB->MQTT] Tópico desconhecido: {mqtt_topic}")
+
+                time.sleep(0.01)  # Delay entre documentos
+
+            except Exception as e:
+                print(f"[ERRO] Processamento de documento falhou: {e}")
 
         if not documentos_encontrados:
-            print(f"[MongoDB->MQTT] Nenhum novo documento.")
-        time.sleep(0.5)
+            print(f"[MongoDB->MQTT] Nenhum novo documento encontrado.")
+
+        time.sleep(0.5)  # Intervalo entre verificações
 
 
 if __name__ == "__main__":

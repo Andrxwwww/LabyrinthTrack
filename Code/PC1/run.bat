@@ -1,12 +1,9 @@
 @echo off
 echo Iniciando scripts Python...
 
-REM Ativar ambiente virtual, se aplicável
-REM call ".\venv\Scripts\activate.bat"
+REM Abrir duas janelas separadas com os scripts
+start "" cmd /k python MongoToMqtt.py
+start "" cmd /k python CloudToMongo.py
 
-REM Iniciar os scripts em janelas separadas
-start cmd /k python newMongoToMqtt.py
-start cmd /k python newCloudToMongo.py
-
-echo Scripts iniciados.
-pause
+REM Fechar imediatamente a janela do .bat
+exit
