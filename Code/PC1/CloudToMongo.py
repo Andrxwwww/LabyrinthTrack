@@ -7,6 +7,10 @@ import signal
 
 from MongoConfigs import *
 
+#Broker novo:
+# > mazerun 15 1 1 20.39.241.21 1883
+
+
 # Limpar todas as coleções **REMOVER DEPOIS**
 collection_move.delete_many({})
 collection_sound.delete_many({})
