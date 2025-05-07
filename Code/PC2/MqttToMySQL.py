@@ -20,6 +20,7 @@ MySQLToMySQL.main()
 
 # Variáveis globais
 current_game = 0
+num_marsamis_tired = 0
 db_lock = threading.Lock()
 current_game_lock = threading.Lock()
 
@@ -178,7 +179,12 @@ def process_sound_message(payload):
         idjogo = get_idjogo_atual()
         if idjogo is None:
             print("[MQTT->MySQL] Nenhum jogo com estado 'running' encontrado.")
-            idjogo = 1
+            ack_message = json.dumps({
+                "IDMongo": id_sound,
+                "collection": "Sound"
+            })
+            client_mqtt.publish(GROUP_MQTT_ACK_TOPIC, ack_message, qos=2)
+            print(f"[MQTT->MySQL] ACK enviado para {id_sound}")
 
         if verificar_outlier(sound, idjogo):
             dados_som = json.dumps(
@@ -243,6 +249,14 @@ def process_move_message(payload):
         if idjogo is None:
             print("[MQTT->MySQL] Nenhum jogo com estado 'running' encontrado.")
             return
+        
+        if status == status_cansado or status == status_fail:
+            global num_marsamis_tired
+            num_marsamis_tired += 1
+            if num_marsamis_tired == MAX_MARSAMIS * 2:
+                cursor.execute( "UPDATE jogo SET Estado = 'finished' WHERE IDJogo = %s", (idjogo,))
+                db.commit()
+                print(f"[MQTT->MySQL] Jogo {idjogo} terminado devido a {num_marsamis_tired} marsamis cansados.")
 
         if not validar_mensagem_move(dados):
             dados_move = json.dumps(convert_data_for_failedCollection(dados, "4. Mensagem inválida", "Move"))

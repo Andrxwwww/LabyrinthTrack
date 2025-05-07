@@ -19,11 +19,11 @@ collection_failed.delete_many({})
 message_received = 0
 lock = threading.Lock()  # Lock para garantir que a variável message_count é atualizada corretamente
 
-# Inicializar documento dos last IDs se não existir
-# collection_lastids.replace_one({}, {
-#     "LastIDMove": 0,
-#     "LastIDSound": 0
-# }, upsert=True)
+# Inicializar documento dos last IDs se não existir **REMOVER DEPOIS**
+collection_lastids.replace_one({}, {
+     "LastIDMove": 0,
+     "LastIDSound": 0
+}, upsert=True)
 
 # Ler os valores atuais
 doc_last_ids = collection_lastids.find_one({})

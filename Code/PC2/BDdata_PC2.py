@@ -55,6 +55,7 @@ try:
     # PARA SOUND
     NOISEVARTOL = float(get_config_prof("noisevartoleration"))
     NORMALNOISE = float(get_config_prof("normalnoise"))
+    MAX_MARSAMIS = int(get_config_prof("numbermarsamis"))
     LIMITE_DESVIO_PADRAO = float(get_config("limite_desvio_padrao"))
     QTD_VALS_SOUND_MAX = int(get_config("qtd_valores_sound_max"))
     QTD_VALS_SOUND_MIN = int(get_config("qtd_valores_sound_mIN"))
@@ -75,6 +76,7 @@ except Exception as e:
     print("[AVISO] A usar valores padrão de emergência.")
     NORMALNOISE = 19
     NOISEVARTOL = 2.5
+    MAX_MARSAMIS = 30
     LIMITE_DESVIO_PADRAO = 3.0
     QTD_VALS_SOUND_MAX = 4
     QTD_VALS_SOUND_MIN = 2
