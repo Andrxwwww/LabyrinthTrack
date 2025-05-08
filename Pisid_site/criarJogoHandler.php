@@ -12,7 +12,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         die("Erro na ligação: " . $conn->connect_error);
     }
 
-    $stmt = $conn->prepare("CALL StartGame(?)");
+    $stmt = $conn->prepare("CALL Criar_jogo(?)");
     $stmt->bind_param("s", $descricao);
 
     if ($stmt->execute()) {

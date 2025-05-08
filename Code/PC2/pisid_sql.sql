@@ -3,9 +3,9 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Tempo de geração: 05-Maio-2025 às 17:13
--- Versão do servidor: 10.4.32-MariaDB
--- versão do PHP: 8.2.12
+-- Tempo de geração: 08-Maio-2025 às 02:10
+-- Versão do servidor: 10.4.28-MariaDB
+-- versão do PHP: 8.2.4
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -25,19 +25,55 @@ DELIMITER $$
 --
 -- Procedimentos
 --
-CREATE DEFINER=`root`@`localhost` PROCEDURE `CreateDbUser` (IN `p_username` VARCHAR(100), IN `p_password` VARCHAR(100))   BEGIN
+CREATE DEFINER=`root`@`localhost` PROCEDURE `Alterar_jogo` (IN `p_IDJogo` INT, IN `p_descricao` TEXT)   BEGIN
+DECLARE v_existsGame BOOLEAN;
 
-IF p_username IS NULL OR CHAR_LENGTH(TRIM(p_username)) = 0 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Não foi inserido nenhum username";END IF;
-IF p_password IS NULL OR CHAR_LENGTH(TRIM(p_password)) = 0 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Não foi inserida nenhuma password";END IF;
+    CALL ExistsGame(p_IDJogo, v_existsGame);
 
-SET @sql := CONCAT('CREATE USER \'', p_username, '\'@\'localhost\' IDENTIFIED BY \'', p_password, '\'');
+    IF v_existsGame = FALSE THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Jogo Inserido não existe";
+    END IF;
 
-    PREPARE stmt FROM @sql;
-    EXECUTE stmt;
-    DEALLOCATE PREPARE stmt;
+    UPDATE jogo
+    SET Descricao = COALESCE(NULLIF(p_descricao, ''), Descricao)
+    WHERE IDJogo = p_IDJogo;
 END$$
 
-CREATE DEFINER=`root`@`localhost` PROCEDURE `CreateUtilizador` (IN `p_Nome` VARCHAR(100), IN `p_Telemovel` VARCHAR(12), IN `p_Tipo` VARCHAR(20), IN `p_Grupo` VARCHAR(20), IN `p_Email` VARCHAR(50), IN `p_Password` VARCHAR(100))   BEGIN
+CREATE DEFINER=`root`@`localhost` PROCEDURE `CreateDbUser` (IN `p_username` VARCHAR(100), IN `p_password` VARCHAR(100))   BEGIN
+
+  IF p_username IS NULL OR CHAR_LENGTH(TRIM(p_username)) = 0 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Não foi inserido nenhum username";
+  END IF;
+
+  IF p_password IS NULL OR CHAR_LENGTH(TRIM(p_password)) = 0 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Não foi inserida nenhuma password";
+  END IF;
+
+  SET @sql := CONCAT('CREATE USER \'', p_username, '\'@\'localhost\' IDENTIFIED BY \'', p_password, '\'');
+  PREPARE stmt FROM @sql;
+  EXECUTE stmt;
+  DEALLOCATE PREPARE stmt;
+
+  SET @grant_sql := CONCAT('GRANT ALL PRIVILEGES ON pisid_sql.* TO \'', p_username, '\'@\'localhost\'');
+  PREPARE grant_stmt FROM @grant_sql;
+  EXECUTE grant_stmt;
+  DEALLOCATE PREPARE grant_stmt;
+
+END$$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `Criar_jogo` (IN `p_descricao` TEXT)   BEGIN
+DECLARE v_exists BOOLEAN DEFAULT FALSE;
+    SET @name := SUBSTRING_INDEX(SESSION_USER(), '@localhost', 1);
+
+    IF CHAR_LENGTH(p_descricao) > 999 THEN 
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT= "Descrição demasiado longa";
+    END IF;
+
+    INSERT INTO jogo(descricao, jogador, DataHorainicio, estado) 
+    VALUES (p_descricao, @name, NOW(), 'pending');
+END$$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `Criar_utilizador` (IN `p_Nome` VARCHAR(100), IN `p_Telemovel` VARCHAR(12), IN `p_Tipo` VARCHAR(20), IN `p_Grupo` VARCHAR(20), IN `p_Email` VARCHAR(50), IN `p_Password` VARCHAR(100))   BEGIN
 
 DECLARE v_alreadyExists BOOLEAN DEFAULT FALSE;
 DECLARE v_validEmail BOOLEAN DEFAULT FALSE;
@@ -54,7 +90,7 @@ CALL ExistsUtilizador(p_Email, v_alreadyExists);
                                      
 IF v_alreadyExists = TRUE THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Este utilizador já existe";END IF;
                                       
-CALL CreateDbUser(p_Nome,p_Password);                                     
+CALL CreateDbUser(p_Email,p_Password);                                     
 INSERT INTO utilizador (nome, telemovel, tipo, grupo, email)
 VALUES (p_Nome, p_Telemovel, p_Tipo, p_Grupo, p_Email);                                     
 END$$
@@ -89,28 +125,7 @@ COMMIT;
 
 END$$
 
-CREATE DEFINER=`root`@`localhost` PROCEDURE `EditGameUtilizador` (IN `p_IDJogo` INT, IN `p_jogador` VARCHAR(50), IN `p_descricao` TEXT)   BEGIN
-DECLARE v_existsGame BOOLEAN;
-DECLARE v_existsJogador BOOLEAN;
-DECLARE v_isGameCreator BOOLEAN;
-
-IF p_IDJogo IS NULL THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Não foi inserido nenhum jogo";END IF;
-IF p_jogador IS NULL THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Não foi inserido nenhum jogador";END IF;
-
-CALL ExistsGame(p_IDJogo,v_existsGame);
-CALL ExistsUtilizador(p_jogador, v_existsJogador);
-CALL IsGameCreator(p_IDJogo, p_jogador, v_isGameCreator);
-IF v_existsGame = FALSE THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Jogo Inserido não existe";
-END IF;
-IF v_existsJogador = FALSE THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Jogador Inserido não existe";
-END IF;
-IF v_isGameCreator = FALSE THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Jogador Inserido não é o criador deste jogo existe";
-END IF;
-UPDATE jogo SET Descricao = COALESCE(NULLIF(p_descricao,''),Descricao) WHERE IDJogo = p_IDJogo;
-
-END$$
-
-CREATE DEFINER=`root`@`localhost` PROCEDURE `EliminateGame` (IN `p_IDJogo` INT)   BEGIN
+CREATE DEFINER=`root`@`localhost` PROCEDURE `Eliminar_Jogo` (IN `p_IDJogo` INT)   BEGIN
 
 DECLARE v_existsGame BOOLEAN;
 
@@ -122,18 +137,6 @@ CALL ExistsGame(p_IDJogo,v_existsGame);
 IF(v_existsGame = FALSE) THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Não existe nenhum jogo com esse ID";END IF;
 
 DELETE FROM jogo WHERE IDJogo=p_IDJogo;
-END$$
-
-CREATE DEFINER=`root`@`localhost` PROCEDURE `EliminateUtilizador` (IN `p_utilizador` VARCHAR(50))   BEGIN
-DECLARE v_existsUtilizador BOOLEAN;
-
-IF (p_utilizador IS NULL OR p_utilizador = '') THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Não foi inserido nenhum utilizador";END IF;
-
-CALL ExistsUtilizador(p_utilizador,v_existsUtilizador);
-
-IF (v_existsUtilizador = FALSE) THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Utilizador não existe";END IF;
-
-DELETE FROM utilizador WHERE  Email= p_utilizador;
 END$$
 
 CREATE DEFINER=`root`@`localhost` PROCEDURE `ExistsGame` (IN `p_IDJogo` INT, OUT `p_exists` BOOLEAN)   BEGIN
@@ -174,6 +177,12 @@ IF v_isGameFinished = TRUE THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Este
 IF v_isGameRunning = FALSE THEN SIGNAL SQLSTATE '45000' set MESSAGE_TEXT = "O jogo precisa de estar a correr para poder ser finalizado";END IF;
 
 UPDATE jogo SET Estado = 'finished' WHERE IDJogo= p_IDJogo; 
+
+END$$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `GetGames` (IN `p_grupo` INT)   BEGIN
+
+SELECT * FROM jogo j INNER JOIN utilizador u ON j.jogador = u.Email WHERE u.Grupo = p_grupo;
 
 END$$
 
@@ -237,21 +246,16 @@ SELECT COUNT(*) INTO v_count FROM jogo WHERE IDJogo = p_IDJogo AND Estado = 'run
 SET p_running = (v_count > 0);
 END$$
 
-CREATE DEFINER=`root`@`localhost` PROCEDURE `StartGame` (IN `p_descricao` TEXT, IN `p_jogador` VARCHAR(50))   BEGIN
-DECLARE v_exists BOOLEAN DEFAULT FALSE;
- IF p_jogador IS NULL THEN
- SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Insira um email válido  e existente para poder criar o jogo";
- END IF;
- 
+CREATE DEFINER=`root`@`localhost` PROCEDURE `Remover_utilizador` (IN `p_utilizador` VARCHAR(50))   BEGIN
+DECLARE v_existsUtilizador BOOLEAN;
 
-CALL ExistsUtilizador(p_jogador,v_exists);
+IF (p_utilizador IS NULL OR p_utilizador = '') THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Não foi inserido nenhum utilizador";END IF;
 
-IF v_exists = FALSE THEN
-SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Este Email não existe na base de dados";
-END IF;
+CALL ExistsUtilizador(p_utilizador,v_existsUtilizador);
 
-IF CHAR_LENGTH(p_descricao) > 999 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT= "Descrição demasiado longa";END IF;
- INSERT INTO jogo(descricao,jogador,DataHorainicio,estado) VALUES (p_descricao,p_jogador,NOW(),'pending');
+IF (v_existsUtilizador = FALSE) THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Utilizador não existe";END IF;
+
+DELETE FROM utilizador WHERE  Email= p_utilizador;
 END$$
 
 CREATE DEFINER=`root`@`localhost` PROCEDURE `StartRunGame` (IN `p_IDJogo` INT, IN `p_jogador` VARCHAR(50))   BEGIN
@@ -391,7 +395,8 @@ CREATE TABLE `jogo` (
 
 INSERT INTO `jogo` (`IDJogo`, `Descricao`, `jogador`, `DataHorainicio`, `Estado`, `Score`, `spamTol`) VALUES
 (1, 'New game description', 'johndoe@example.com', '2025-05-05 13:41:22', 'running', 100, 3),
-(3, 'teste', 'player1@example.com', '2025-05-01 11:26:07', 'pending', -1, 0);
+(3, 'testeHGKJHGKJHG', 'player1@example.com', '2025-05-08 00:06:24', 'pending', -1, 0),
+(6, 'adasdasdadasdsadasdasfffffffffffffff', 'rafaelnicolau@gmail.com', '2025-05-08 00:06:18', 'pending', -1, 0);
 
 -- --------------------------------------------------------
 
@@ -672,7 +677,8 @@ CREATE TABLE `utilizador` (
 INSERT INTO `utilizador` (`Nome`, `Telemovel`, `Tipo`, `Grupo`, `Email`) VALUES
 ('ff', '22', '22', 22, '22'),
 ('John Doe', '912345678', 'Pla', 0, 'johndoe@example.com'),
-('player1', '123456789', '11', 15, 'player1@example.com');
+('player1', '123456789', '11', 15, 'player1@example.com'),
+('Rafael', '123414', 'Adm', 15, 'rafaelnicolau@gmail.com');
 
 --
 -- Índices para tabelas despejadas
@@ -751,7 +757,7 @@ ALTER TABLE `corridor`
 -- AUTO_INCREMENT de tabela `jogo`
 --
 ALTER TABLE `jogo`
-  MODIFY `IDJogo` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `IDJogo` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- AUTO_INCREMENT de tabela `mensagens`
