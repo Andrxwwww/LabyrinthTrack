@@ -15,8 +15,8 @@ from concurrent.futures import ThreadPoolExecutor
 from BDConfigs import *
 from BDdata_PC2 import *
 import MySQLToMySQL
-MySQLToMySQL.main()
 
+MySQLToMySQL.main()
 
 # Variáveis globais
 current_game = 0
@@ -28,9 +28,10 @@ current_game_lock = threading.Lock()
 message_queue = Queue()
 executor = ThreadPoolExecutor(max_workers=4)  # Ajuste conforme necessidade
 
+PLAYER_ID = 15
+
 # Função para validar datas
 def validar_data(data):
-
     # Verifica se a data está no formato correto
     try:
         datetime.strptime(data, "%Y-%m-%d %H:%M:%S.%f")
@@ -52,7 +53,6 @@ def validar_data(data):
 # Função para validar mensagens de movimento
 # TODO: Falta o MongoToMQTT receber as mensagens que estão nesse topico
 def validar_mensagem_move(doc):
-
     origem = doc.get("RoomOrigin")
     destino = doc.get("RoomDestiny")
     status = doc.get("Status")
@@ -72,25 +72,24 @@ def validar_mensagem_move(doc):
 
     # TODO: DEPOIS TIRAR PARA DADOS MAIS RECENTES
     # Validação 7: Verificar se a data está dentro do intervalo
-    #if not validar_data(Hora):
+    # if not validar_data(Hora):
     #   return False
 
     return False
 
 
-
 # Funcao para verificar se é outlier ou nao
-def verificar_outlier(sound_value , idjogo):
-
+def verificar_outlier(sound_value, idjogo):
     limite = NOISEVARTOL * LIMITE_DESVIO_PADRAO  # Limite para considerar um valor como outlier
 
     # Obter os últimos 4 valores válidos do som para o jogo
     cursor.execute("""
-        SELECT Sound FROM sound 
-        WHERE IdJogo = %s 
-        ORDER BY Hour DESC 
-        LIMIT 20
-    """, (idjogo,))
+                   SELECT Sound
+                   FROM sound
+                   WHERE IdJogo = %s
+                   ORDER BY Hour DESC
+                       LIMIT 20
+                   """, (idjogo,))
 
     resultados = cursor.fetchall()
     historico = []
@@ -112,8 +111,8 @@ def verificar_outlier(sound_value , idjogo):
     media = statistics.mean(historico)
     return abs(sound_value - media) > limite
 
-def verificar_variacao_som(sound_value,id_sound, hour, idjogo):
 
+def verificar_variacao_som(sound_value, id_sound, hour, idjogo):
     VARTOL_80 = NOISEVARTOL * LIMITE_80
     VARTOL_90 = NOISEVARTOL * LIMITE_90
 
@@ -126,8 +125,8 @@ def verificar_variacao_som(sound_value,id_sound, hour, idjogo):
         print(f"[Mqtt -> MySQL] Erro ao converter valores de som: {e}")
         return
 
-    #variacao = abs(ultimo - penultimo)
-    #print(variacao)
+    # variacao = abs(ultimo - penultimo)
+    # print(variacao)
     print(ultimo)
     print(S80_LIMIT_NOISE)
     print(S90_LIMIT_NOISE)
@@ -141,7 +140,8 @@ def verificar_variacao_som(sound_value,id_sound, hour, idjogo):
                 cursor.execute(
                     "INSERT INTO mensagens (ID, Hora, Sala, Sensor, Leitura, TipoAlerta, Msg, HoraEscrita, IdJogo) "
                     "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
-                    (id_sound, hour, None, 1, round(ultimo, 2), "Limite 90%", "Som a 90% do limite", datetime.now().strftime('%Y-%m-%d %H:%M:%S'), idjogo)
+                    (id_sound, hour, None, 1, round(ultimo, 2), "Limite 90%", "Som a 90% do limite",
+                     datetime.now().strftime('%Y-%m-%d %H:%M:%S'), idjogo)
                 )
                 db.commit()
                 print(f"[MQTT->MySQL] Registro inserido na tabela mensagens: Som a 90% do limite (ID {id_sound})")
@@ -157,7 +157,8 @@ def verificar_variacao_som(sound_value,id_sound, hour, idjogo):
                 cursor.execute(
                     "INSERT INTO mensagens (ID, Hora, Sala, Sensor, Leitura, TipoAlerta, Msg, HoraEscrita, IdJogo) "
                     "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
-                    (id_sound, hour, None, 2, round(ultimo, 2), "Limite 80%", "Som a 80% do limite", datetime.now().strftime('%Y-%m-%d %H:%M:%S'), idjogo)
+                    (id_sound, hour, None, 2, round(ultimo, 2), "Limite 80%", "Som a 80% do limite",
+                     datetime.now().strftime('%Y-%m-%d %H:%M:%S'), idjogo)
                 )
                 db.commit()
                 print(f"[MQTT->MySQL] Registro inserido na tabela mensagens: Som a 80% do limite (ID {id_sound})")
@@ -165,6 +166,7 @@ def verificar_variacao_som(sound_value,id_sound, hour, idjogo):
                 print(f"[MQTT->MySQL] Erro ao inserir na tabela mensagens: {e}")
     else:
         print("[Mqtt -> MySQL] Variação do som abaixo de 80% do limite.")
+
 
 # Callback para mensagens de SOUND
 def process_sound_message(payload):
@@ -197,7 +199,8 @@ def process_sound_message(payload):
                     cursor.execute(
                         "INSERT INTO mensagens (ID, Hora, Sala, Sensor, Leitura, TipoAlerta, Msg, HoraEscrita, IdJogo) "
                         "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
-                        (id_sound, hour, None , 1 , round(float(sound),2), "Outlier", "Outlier detetado", datetime.now().strftime('%Y-%m-%d %H:%M:%S'), idjogo)
+                        (id_sound, hour, None, 1, round(float(sound), 2), "Outlier", "Outlier detetado",
+                         datetime.now().strftime('%Y-%m-%d %H:%M:%S'), idjogo)
                     )
                     db.commit()
                     print(f"[MQTT->MySQL] Registro inserido na tabela mensagens para outlier: ID {id_sound}")
@@ -205,7 +208,7 @@ def process_sound_message(payload):
                     print(f"[MQTT->MySQL] Erro ao inserir na tabela mensagens: {e}")
 
         else:
-            verificar_variacao_som(sound , id_sound, hour, idjogo)
+            verificar_variacao_som(sound, id_sound, hour, idjogo)
             with db_lock:
                 try:
                     cursor.execute(
@@ -232,6 +235,7 @@ def process_sound_message(payload):
     except Exception as e:
         print(f"[SOUND] Erro no processamento: {e}")
 
+
 # Callback para mensagens de MEDIÇÕES
 def process_move_message(payload):
     try:
@@ -249,15 +253,17 @@ def process_move_message(payload):
         if idjogo is None:
             print("[MQTT->MySQL] Nenhum jogo com estado 'running' encontrado.")
             return
-        
+
         if status == status_cansado or status == status_fail:
             global num_marsamis_tired
             num_marsamis_tired += 1
             if num_marsamis_tired == MAX_MARSAMIS * 2:
-                cursor.execute( "UPDATE jogo SET Estado = 'finished' WHERE IDJogo = %s", (idjogo,))
+                cursor.execute("UPDATE jogo SET Estado = 'finished' WHERE IDJogo = %s", (idjogo,))
                 db.commit()
                 print(f"[MQTT->MySQL] Jogo {idjogo} terminado devido a {num_marsamis_tired} marsamis cansados.")
-
+                # Calcular e salvar o score total após o término do jogo
+                num_marsamis_tired = 0
+                calculate_total_score(PLAYER_ID, idjogo)
 
         if not validar_mensagem_move(dados):
             dados_move = json.dumps(convert_data_for_failedCollection(dados, "4. Mensagem inválida", "Move"))
@@ -291,6 +297,7 @@ def process_move_message(payload):
     except Exception as e:
         print(f"[MOVE] Erro no processamento: {e}")
 
+
 # Callback MQTT unificado
 def on_message(client, userdata, msg):
     try:
@@ -300,8 +307,8 @@ def on_message(client, userdata, msg):
     except Exception as e:
         print(f"[MQTT] Erro no callback geral: {e}")
 
-current_game_lock = threading.Lock()
 
+current_game_lock = threading.Lock()
 
 
 # Consumidor da fila
@@ -318,6 +325,50 @@ def queue_consumer():
             print(f"[Consumer] Erro no consumer: {e}")
         time.sleep(0.01)
 
+REMOTE_DB_CONFIG = {
+    "host": "194.210.86.10",
+    "user": "aluno",
+    "password": "aluno",
+    "database": "maze",
+    "connect_timeout": 1000
+}
+
+def calculate_total_score(player_id, idjogo):
+    with db_lock:
+        try:
+            # Conectar ao banco remoto (maze)
+            db_remote = mariadb.connect(**REMOTE_DB_CONFIG)
+            if not db_remote:
+                print("Não foi possível conectar ao banco de dados remoto para calcular o score.")
+                return
+            cursor_remote = db_remote.cursor()
+            sql = "SELECT `Score`, `attempt`, `Room` FROM `roomsscore` WHERE `Player` = %s;"
+            cursor_remote.execute(sql, (player_id,))
+            records = cursor_remote.fetchall()
+            total_score = 0
+            for row in records:
+                score = float(row[0])
+                attempt = int(row[1])
+                room = int(row[2])
+                total_score += score
+                print(f"Sala {room}: Score = {score}, Tentativa = {attempt}")
+            print(f"Score Total do Jogador {player_id}: {total_score}")
+            cursor_remote.close()
+            db_remote.close()
+
+            # Atualizar a tabela jogo no banco local com o score total
+            if idjogo is not None:
+                cursor.execute("UPDATE jogo SET Score = %s WHERE IDJogo = %s;", (total_score, idjogo))
+                db.commit()
+                print(f"Score {total_score} salvo na tabela jogo para IDJogo {idjogo}")
+            else:
+                print("Nenhum IDJogo disponível para salvar o score.")
+
+        except Exception as e:
+            print(f"Erro ao processar score: {e}")
+
+
+
 def createGame(idjogo):
     global current_game
     with current_game_lock:
@@ -331,9 +382,9 @@ def createGame(idjogo):
             print(f"[MQTT->MySQL] Guardado no MySQL (Jogo): {idjogo}")
 
 
-
 # New lock specifically for database operations
 db_lock = threading.Lock()
+
 
 def get_idjogo_atual():
     with db_lock:
@@ -352,7 +403,7 @@ def get_idjogo_atual():
 def keep_alive_sender():
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     client.connect(MQTT_BROKER, MQTT_PORT, 60)
-    print("Conectado ao MQTT "+ MQTT_BROKER)
+    print("Conectado ao MQTT " + MQTT_BROKER)
     client.loop_start()
 
     while True:
@@ -379,6 +430,7 @@ def keep_alive_sender():
     client.disconnect()
     print("[MQTT->MySQL] Keep Alive thread terminada.")
 
+
 def reconnect_db():
     global db, cursor
     try:
@@ -401,6 +453,7 @@ def reconnect_db():
         except mariadb.Error as e:
             print(f"[MQTT->MySQL] Erro ao reconectar ao MySQL: {e}")
             time.sleep(10)
+
 
 # Configuração do cliente MQTT
 def start_mqtt_client():

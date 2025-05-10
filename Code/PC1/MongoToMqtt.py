@@ -122,14 +122,19 @@ def publish_data(collection, mqtt_topic):
             mensagem = documento.copy()
 
             if mqtt_topic == GROUP_MQTT_MOVE_TOPIC:
-                if validar_movimento(documento):
+                if documento.get("IDMove") == 0 or documento.get("IDSound") == 2:
+                    if validar_movimento(documento):
+                        mensagem_json = json.dumps(mensagem, default=str)
+                        print(f"[MongoDB->MQTT] Publicado Move (VALIDADO): {mensagem_json}")
+                        client.publish(mqtt_topic, mensagem_json)
+                    else:
+                        collection_move.update_one({"IDMove": documento.get("IDMove")}, {"$set": {"IsMigrated": True}})
+                        collection_failed.insert_one(convert_data_for_failedCollection(documento,"2.[Mongo->MQTT] Movimento Invalido","Move"))  # Guardar na coleção Failed
+                        print(f"[MongoDB->MQTT] Documento Move (INVÁLIDO) guardado em 'Failed': {documento}")
+                else:
                     mensagem_json = json.dumps(mensagem, default=str)
                     print(f"[MongoDB->MQTT] Publicado Move (VALIDADO): {mensagem_json}")
                     client.publish(mqtt_topic, mensagem_json)
-                else:
-                    collection_move.update_one({"IDMove": documento.get("IDMove")}, {"$set": {"IsMigrated": True}})
-                    collection_failed.insert_one(convert_data_for_failedCollection(documento,"2.[Mongo->MQTT] Movimento Invalido","Move"))  # Guardar na coleção Failed
-                    print(f"[MongoDB->MQTT] Documento Move (INVÁLIDO) guardado em 'Failed': {documento}")
 
             elif mqtt_topic == GROUP_MQTT_SOUND_TOPIC:
                 if validar_sound(documento):
