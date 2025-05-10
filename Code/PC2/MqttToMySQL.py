@@ -265,6 +265,7 @@ def process_move_message(payload):
                 num_marsamis_tired = 0
                 calculate_total_score(PLAYER_ID, idjogo)
 
+
         if not validar_mensagem_move(dados):
             dados_move = json.dumps(convert_data_for_failedCollection(dados, "4. Mensagem inválida", "Move"))
             client_mqtt.publish(GROUP_MQTT_FAILED_TOPIC, dados_move)
@@ -394,6 +395,7 @@ def get_idjogo_atual():
             if result:
                 return result[0]
             else:
+                reconnect_db()
                 return None  # Ou lança exceção, dependendo do comportamento desejado
         except Exception as e:
             print(f"[MQTT->MySQL] Erro ao obter IDJogo atual: {e}")
