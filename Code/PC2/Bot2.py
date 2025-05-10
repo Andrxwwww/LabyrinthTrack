@@ -69,6 +69,7 @@ def initialize_door_states():
     except Exception as e:
         print(f"Erro ao inicializar portas: {e}")
 
+
 def get_room_states():
     try:
         with db_lock:
@@ -76,7 +77,24 @@ def get_room_states():
             if not db:
                 return {}
             cursor = db.cursor(dictionary=True)
-            cursor.execute("SELECT Sala, NumeroMarsamisOdd, NumeroMarsamisEven FROM ocupacaolabirinto WHERE Sala >= 1")
+
+            # Obter o IDJogo atual
+            cursor.execute("SELECT IDJogo FROM jogo WHERE Estado = 'running' ORDER BY IDJogo DESC LIMIT 1")
+            result = cursor.fetchone()
+            if not result:
+                print("Nenhum jogo em execução encontrado.")
+                cursor.close()
+                db.close()
+                return {}
+            id_jogo_atual = result['IDJogo']
+
+            # Buscar os estados das salas para o IDJogo atual
+            cursor.execute(
+                "SELECT Sala, NumeroMarsamisOdd, NumeroMarsamisEven "
+                "FROM ocupacaolabirinto "
+                "WHERE Sala >= 1 AND IDJogo = %s",
+                (id_jogo_atual,)
+            )
             rooms = cursor.fetchall()
             cursor.close()
             db.close()
@@ -187,7 +205,7 @@ def check_score_triggers():
                         print(f"[SCORE TRIGGER] {mensagem}")
 
                         if trigger_count[room_id] == 3:
-                            print(f"⚠️ Sala {room_id} atingiu o limite de 3 triggers!")
+                            print(f" Sala {room_id} atingiu o limite de 3 triggers!")
 
             time.sleep(2)  # Verificar a cada 2 segundos
         except Exception as e:
@@ -274,12 +292,12 @@ if __name__ == "__main__":
     try:
         while not stop_event.is_set():
             time.sleep(1)
-        print("\n🔴 Encerrando sistema...")
+        print("\n Encerrando sistema...")
         mqtt_client.loop_stop()
         mqtt_client.disconnect()
         sys.exit(0)
     except KeyboardInterrupt:
-        print("\n🔴 Encerrando por interrupção do usuário...")
+        print("\n Encerrando por interrupção do usuário...")
         stop_event.set()
         mqtt_client.loop_stop()
         mqtt_client.disconnect()

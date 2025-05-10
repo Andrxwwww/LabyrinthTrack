@@ -72,6 +72,7 @@ def check_game_status():
             break
         time.sleep(1)
 
+
 # Função para verificar balanceamento
 def check_balance():
     trigger_count = {}
@@ -82,8 +83,22 @@ def check_balance():
                 if not db:
                     continue
                 cursor = db.cursor(dictionary=True)
+
+                # Obter o IDJogo atual usando a função existente
+                id_jogo_atual = get_idjogo_atual()
+                if not id_jogo_atual:
+                    print("Nenhum jogo em execução encontrado.")
+                    cursor.close()
+                    db.close()
+                    time.sleep(1)
+                    continue
+
+                # Buscar os estados das salas para o IDJogo atual
                 cursor.execute(
-                    "SELECT Sala, NumeroMarsamisOdd, NumeroMarsamisEven FROM ocupacaolabirinto WHERE Sala >= 1"
+                    "SELECT Sala, NumeroMarsamisOdd, NumeroMarsamisEven "
+                    "FROM ocupacaolabirinto "
+                    "WHERE Sala >= 1 AND IDJogo = %s",
+                    (id_jogo_atual,)
                 )
                 rooms = cursor.fetchall()
                 cursor.close()
