@@ -35,8 +35,8 @@ def get_db_connection():
     try:
         return mariadb.connect(
             host="127.0.0.1",
-            user="script",
-            password="script",
+            user="script2",
+            password="12345",
             database="pisid_sql"
         )
     except mariadb.Error as e:

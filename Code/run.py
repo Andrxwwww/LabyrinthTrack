@@ -4,16 +4,17 @@ import os
 import threading
 import time
 def run_bot():
-    module_path = os.path.abspath(os.path.join("Code", "PC2"))
+    module_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "PC2"))
     if module_path not in sys.path:
         sys.path.insert(0, module_path)
 
-    with open('Code/PC2/Bot.py') as f:
+    bot_path = os.path.join(module_path, "Bot2.py")
+    with open(bot_path) as f:
         code = f.read()
         exec(code, globals())
 
 def run_mazerun():
-    target_dir = "C:/Users/Rafael/Desktop/versao2/versao2"
+    target_dir = "C:\\versao2"
     command = "mazerun 15 1 5 20.39.241.21 1883"
     subprocess.run(command, cwd=target_dir, shell=True)
 

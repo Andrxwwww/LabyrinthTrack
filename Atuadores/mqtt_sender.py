@@ -11,7 +11,7 @@ def main():
     parser.add_argument("--player", type=int, default=15, help="ID do jogador (por defeito: 15)")
     parser.add_argument("--room_origin", type=int, help="Sala de origem (opcional)")
     parser.add_argument("--room_destiny", type=int, help="Sala de destino (opcional)")
-    parser.add_argument("--broker", default="broker.emqx.io", help="Endereço do broker MQTT")
+    parser.add_argument("--broker", default="20.39.241.21", help="Endereço do broker MQTT")
     parser.add_argument("--port", type=int, default=1883, help="Porta do broker MQTT")
     parser.add_argument("--topic", default="pisid_mazeact", help="Tópico MQTT")
     parser.add_argument("--room", type=int, help="Sala única (opcional)")
