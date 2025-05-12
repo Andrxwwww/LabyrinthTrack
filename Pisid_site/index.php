@@ -73,3 +73,9 @@
     <script src="script.js"></script>
   </body>
 </html>
+
+<?php if (isset($_GET['error'])): ?>
+<div class="popup-error">
+    <?php echo "Password ou Email incorretos" ?>
+</div>
+<?php endif; ?>

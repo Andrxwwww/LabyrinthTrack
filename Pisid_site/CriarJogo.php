@@ -43,15 +43,23 @@ mysqli_close ($connPisid);
                 <input placeholder="Pesquisar jogo"/>
             </div>
             <div class="dashboard-logout">
-                <button><i class='bx bxs-door-open'></i></button>
-            </div>
+    <a href="logout.php" title="Terminar sessão" style="text-decoration: none; color: inherit;">
+        <button type="button" style="background: none; border: none; cursor: pointer;">
+            <i class='bx bxs-door-open' style="font-size: 24px;"></i>
+        </button>
+    </a>
+</div>
         </div>
             <div class="" style="background-color:white;margin:40px 70px;padding:30px;border-radius:30px;">
                 <div><h1>Criar um jogo novo:</h1></div>
                 <div style="margin-top:60px;">
                     <div style="display: flex;justify-content:start;align-items:center;margin-top:30px;">
                         <label style="font-size:30px;margin-right:10px;">Descrição:</label>
-                        <input type="textarea" name="descricao" id="descricao" cols="100" rows="4" placeholder="" />
+                        <textarea name="descricao" id="descricao" cols="150" rows="4" placeholder=""></textarea>
+                    </div>
+                    <div style="display: flex;justify-content:start;align-items:center;margin-top:30px;">
+                        <label style="font-size:30px;margin-right:10px;">Delay Time entre mensagens:</label>
+                        <input name="spamTol" id="spamTol" style="width:5%;height:50px;margin-right:20px"  /> segundos
                     </div>
                     <div style="font-size:30px;margin-top:30px;">Utilizador: <?php echo $_SESSION['db_nome']; ?></div>
                     <p style="display: flex;justify-content:end;">

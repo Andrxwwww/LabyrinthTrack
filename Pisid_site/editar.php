@@ -40,8 +40,12 @@ $stmt->close();
                 <input placeholder="Pesquisar jogo"/>
             </div>
             <div class="dashboard-logout">
-                <button><i class='bx bxs-door-open'></i></button>
-            </div>
+    <a href="logout.php" title="Terminar sessão" style="text-decoration: none; color: inherit;">
+        <button type="button" style="background: none; border: none; cursor: pointer;">
+            <i class='bx bxs-door-open' style="font-size: 24px;"></i>
+        </button>
+    </a>
+</div>
         </div>
         <div class="form-container">
             <form  class="form" action="editarJogoHandler.php" method="post"> 

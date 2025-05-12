@@ -47,8 +47,12 @@ mysqli_close ($connPisid);
                 <input placeholder="Pesquisar jogo"/>
             </div>
             <div class="dashboard-logout">
-                <button><i class='bx bxs-door-open'></i></button>
-            </div>
+    <a href="logout.php" title="Terminar sessão" style="text-decoration: none; color: inherit;">
+        <button type="button" style="background: none; border: none; cursor: pointer;">
+            <i class='bx bxs-door-open' style="font-size: 24px;"></i>
+        </button>
+    </a>
+</div>
         </div>
         <?php if($result->num_rows>0) :?> 
             <div class="dashboard-content">
@@ -71,6 +75,7 @@ mysqli_close ($connPisid);
                         <th>Utilizador</th>
                         <th>Data de Inicio</th>
                         <th>Estado</th>
+                        <th>Score</th>
                     </tr>
                 </thead>
 
@@ -86,15 +91,23 @@ mysqli_close ($connPisid);
                                             <button class="action-button delete" onclick="showDeleteGameDialog(<?php echo $jogo['IDJogo']; ?>)">
                                                 <i style="font-size:large;color:red;" class='bx bx-trash'></i>
                                             </button>
-                                            <button class="action-button start" onclick="startGame(<?php echo $jogo['IDJogo']; ?>)" >
+                                            <div style="width:20px">
+
+                                            
+                                            <form action="startGameHandler.php" method="get" onsubmit="window.open('score_graph.php?player=15', '_blank');" >
+                                            <input type="hidden" name="id" value="<?php echo $jogo['IDJogo']; ?>">
+                                            <button class="action-button start" >
                                                 <i style="font-size:large;color:green;" class='bx bx-play'></i>
                                             </button>
+                                            </form>
+                                            </div>
                                         </div></td>
                         <td><?php echo $jogo['IDJogo']?></td>
                         <td><?php echo $jogo['Descricao']?></td>
                         <td><?php echo $jogo['jogador']?></td>
                         <td><?php echo $jogo['DataHorainicio']?></td>
                         <td ><div style="margin-left:auto; margin-right:auto;" class="estado-<?php echo $jogo['Estado']; ?>"><?php echo $jogo['Estado']?></div></td>
+                        <td><?php echo $jogo['Score']?></td>
                     </tr>
                 </tbody>
                 <?php endforeach; ?>
@@ -137,8 +150,15 @@ function showDeleteGameDialog(idJogo) {
         form.submit();
     }
 }
+
+
+
 </script>
   </body>
 </html>
 
-
+<?php if (isset($_GET['error'])): ?>
+  <div class="popup-error">
+    <?php echo htmlspecialchars($_GET['error']); ?>
+  </div>
+<?php endif; ?>

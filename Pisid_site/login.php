@@ -5,10 +5,14 @@ $email = $_POST['Email'];
 $password = $_POST['Password'];
 $db_name = 'pisid_sql';
 
-$conn = new mysqli('localhost',$email,$password, $db_name);
-
-if ($conn -> connect_error){
-    die("Login Failed: Invalid Email or password");
+try {
+    $conn = @new mysqli('localhost', $email, $password, $db_name);
+    if ($conn->connect_error) {
+        throw new Exception("Email ou password inválidos.");
+    }
+} catch (Exception $e) {
+    header("Location: index.php?error=" . urlencode($e->getMessage()));
+    exit();
 }
 
 $rootConn = new mysqli('localhost','root','',$db_name);
