@@ -11,8 +11,8 @@ try:
     # Conexão com o banco de dados local
     db = mariadb.connect(
         host="127.0.0.1",
-        user="root",
-        password="",
+        user="script2",
+        password="12345",
         database="pisid_sql"
     )
     cursor = db.cursor()
