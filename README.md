@@ -29,7 +29,7 @@ This project is a distributed system for managing and monitoring a maze game, in
 ### 1. Python Scripts
 
 - **[obterPontuacao.py](obterPontuacao.py)**  
-  Fetches player scores from the remote ISCTE MySQL database.  
+  Fetches player scores from the remote ISCTE MySQL database. This is a .py test file
   Usage:
   ```sh
   python obterPontuacao.py <PlayerID>
