@@ -1,0 +1,23 @@
+Testar TUDO
+
+A.Correr a BD MySQL e Mongo
+1. Correr o Xampp com priv. de admin
+2. Abrir MongoDB Compass e correr a BD que da jeito
+3. (PARA AS REPLICAS) Correr o bat com as 3 Replicas e alterar no codigo o port do host
+4. ver as permissoes dadas aos ficheiros do python.exe && folder "Code" com o utilizador do apache
+[Isto na cmd no C:\]
+> icacls "C:\Code\run.py" /grant "NOME_DO_UTILIZADOR":F
+> icacls "C:\Python313" /grant "NOME_DO_UTILIZADOR":RX /T
+
+
+B. Criar o utilizador com permissoes para correr 
+4. criar o utilizador script2 
+5. meter permissoes devidas que estão no permissoes.sql ao script2
+
+C. correr os codigo desde da Cloud ate ao MySQL
+6. Correr o run.bat e run2.bat no pc1 e pc2 respectivamente
+
+D. abrir o site 
+7. criar o utilizador usando SP (se necessario)
+8. entrar com o utilizado e criar o jogo
+9. correr o jogo e fica tudo a funcionar na perfeicao

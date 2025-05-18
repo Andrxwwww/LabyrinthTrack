@@ -9,20 +9,17 @@ if (!isset($_SESSION['db_email']) || !isset($_GET['id'])) {
 $username = $_SESSION['db_email'];
 $password = $_SESSION['db_pass'];
 $dbname = "pisid_sql";
-$idJogo = intval($_GET['id']);  // Corrigido para 'id' com letra minúscula (vindo do GET)
-$scriptPath = escapeshellarg("C:\\Code\\run.py");
+$idJogo = intval($_GET['id']);
 
-$pythonPath = "C:\\Users\\bruno\\AppData\\Local\\Programs\\Python\\Python313\\python.exe";
+$pythonPath = "C:\\Python313\\python.exe";
 $scriptPath = "C:\\Code\\run.py";
 $logFile = "C:\\xampp\\htdocs\\Pisid_site\\python_log.txt";
-
 
 // Conectar à base de dados
 $conn = new mysqli("localhost", $username, $password, $dbname);
 if ($conn->connect_error) {
     die("Falha na conexão: " . $conn->connect_error);
 }
-
 
 // Executar procedure para iniciar o jogo
 $stmt = $conn->prepare("CALL Correr_Jogo(?)");
@@ -35,17 +32,9 @@ $stmt->close();
 // Liberta a sessão para não bloquear futuras requisições
 session_write_close();
 
-// Executa o script Python em background (Windows)
-// Comando para rodar o script em background e registrar o log
-$output = shell_exec("whoami");
-echo "<pre>Utilizador do Apache: $output</pre>";
-
-$pythonPath = "C:\\Users\\bruno\\AppData\\Local\\Programs\\Python\\Python313\\python.exe";
-$scriptPath = "C:\\Users\\bruno\\PISID_Scripts\\Code\\run.py";
-
-$command = "\"$pythonPath\" \"$scriptPath\"";
-$output = shell_exec($command . " 2>&1");
-echo "<pre>Output do Python:\n$output</pre>";
+// Executa o script Python em background (sem bloquear, com log)
+$command = "start /B \"\" \"$pythonPath\" \"$scriptPath\" > \"$logFile\" 2>&1";
+pclose(popen($command, "r"));
 
 // Redireciona de volta para o dashboard
 header("Location: dashboard.php");

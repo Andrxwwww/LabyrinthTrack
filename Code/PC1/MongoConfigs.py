@@ -17,7 +17,7 @@ GROUP_MQTT_FAILED_TOPIC = "failed_grupo15"
 GROUP_MQTT_Alive_TOPIC="keep_alive"
 
 # --- Configurações MongoDB ---
-MONGO_URI = "mongodb://localhost:27017/"
+MONGO_URI = "mongodb://localhost:27019/"
 MONGO_DB = "PISID_Maze"
 MONGO_COLLECTION_MOVE = "Move"
 MONGO_COLLECTION_SOUND = "Sound"

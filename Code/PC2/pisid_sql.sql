@@ -3,9 +3,9 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Tempo de geração: 08-Maio-2025 às 02:10
--- Versão do servidor: 10.4.28-MariaDB
--- versão do PHP: 8.2.4
+-- Tempo de geração: 12-Maio-2025 às 22:03
+-- Versão do servidor: 10.4.32-MariaDB
+-- versão do PHP: 8.2.12
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -27,16 +27,113 @@ DELIMITER $$
 --
 CREATE DEFINER=`root`@`localhost` PROCEDURE `Alterar_jogo` (IN `p_IDJogo` INT, IN `p_descricao` TEXT)   BEGIN
 DECLARE v_existsGame BOOLEAN;
+DECLARE v_Tipo VARCHAR(3);
+DECLARE v_CriadorJogo VARCHAR(100);
+DECLARE v_EstadoJogo VARCHAR(20);
+DECLARE v_User VARCHAR(100);
+SET v_User := SUBSTRING_INDEX(SESSION_USER(), '@localhost', 1);
+SELECT Tipo INTO v_Tipo FROM utilizador WHERE Email = v_User;
+SELECT Jogador INTO v_CriadorJogo FROM jogo WHERE IDJogo = p_IDJogo;
 
     CALL ExistsGame(p_IDJogo, v_existsGame);
 
     IF v_existsGame = FALSE THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Jogo Inserido não existe";
     END IF;
+	
+    IF v_CriadorJogo <> v_User AND v_Tipo <> 'ADM' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "O jogador não tem permissoões para alterar este jogo";END IF;
+    
+    SELECT Estado into v_EstadoJogo FROM jogo where IDJogo = p_IDJogo;
 
+IF v_EstadoJogo = 'running' OR v_EstadoJogo =  'finished' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Apenas pode começar jogos no estado pending"; END IF;
+    
+    
     UPDATE jogo
     SET Descricao = COALESCE(NULLIF(p_descricao, ''), Descricao)
     WHERE IDJogo = p_IDJogo;
+END$$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `Alterar_jogo_JSON` (IN `p_IDJogo` INT, IN `p_JSONData` JSON)   BEGIN 
+
+DECLARE v_existsGame BOOLEAN;
+DECLARE v_Tipo VARCHAR(3);
+DECLARE v_CriadorJogo VARCHAR(100);
+DECLARE v_EstadoJogo VARCHAR(20);
+DECLARE v_User VARCHAR(100);
+SET v_User := SUBSTRING_INDEX(SESSION_USER(), '@localhost', 1);
+SELECT Tipo INTO v_Tipo FROM utilizador WHERE Email = v_User;
+SELECT Jogador INTO v_CriadorJogo FROM jogo WHERE IDJogo = p_IDJogo;
+
+    CALL ExistsGame(p_IDJogo, v_existsGame);
+
+    IF v_existsGame = FALSE THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Jogo Inserido não existe";
+    END IF;
+	
+    IF v_CriadorJogo <> v_User AND v_Tipo <> 'ADM' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "O jogador não tem permissoões para alterar este jogo";END IF;
+    
+    SELECT Estado into v_EstadoJogo FROM jogo where IDJogo = p_IDJogo;
+
+IF v_EstadoJogo = 'running' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Apenas pode alterar jogos no estado pending ou finished"; END IF;
+
+UPDATE jogo
+SET 
+
+Descricao = COALESCE(JSON_UNQUOTE(JSON_EXTRACT(p_JSONData,'$.Descricao')),Descricao),
+spamTol = COALESCE(JSON_UNQUOTE(JSON_EXTRACT(p_JSONData,'$.spamTol')),spamTol)
+WHERE IDJogo = p_IDJogo;
+
+
+END$$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `Alterar_utilizador` (IN `p_email` VARCHAR(50), IN `p_json_data` JSON)   BEGIN
+    UPDATE utilizador
+    SET 
+        Nome = COALESCE(JSON_UNQUOTE(JSON_EXTRACT(p_json_data, '$.Nome')), Nome),
+        Telemovel = COALESCE(JSON_UNQUOTE(JSON_EXTRACT(p_json_data, '$.Telemovel')), Telemovel),
+        Tipo = COALESCE(JSON_UNQUOTE(JSON_EXTRACT(p_json_data, '$.Tipo')), Tipo),
+        Grupo = COALESCE(JSON_UNQUOTE(JSON_EXTRACT(p_json_data, '$.Grupo')), Grupo),
+        Email = COALESCE(JSON_UNQUOTE(JSON_EXTRACT(p_json_data, '$.Email')), Email)
+    WHERE Email = p_email;
+END$$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `Correr_Jogo` (IN `p_IDJogo` INT)   BEGIN
+
+DECLARE v_CriadorJogo VARCHAR(100);
+DECLARE v_Tipo VARCHAR(3);
+DECLARE v_ExisteJogo BOOLEAN DEFAULT FALSE;
+DECLARE v_EstadoJogo VARCHAR(20);
+DECLARE v_User VARCHAR(100);
+DECLARE v_ExisteOutroJogoRunning BOOLEAN DEFAULT FALSE;
+DECLARE v_grupo INT;
+IF p_IDJogo IS NULL THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Nenhum jogo foi inserido";END IF;
+
+SET v_User := SUBSTRING_INDEX(SESSION_USER(), '@localhost', 1);
+SELECT Tipo into v_Tipo FROM utilizador WHERE Email = v_User;
+SELECT Jogador INTO v_CriadorJogo FROM jogo WHERE IDJogo = p_IDJogo;
+IF v_User <> v_CriadorJogo AND v_Tipo <> 'ADM' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Não tem permissões para alterar este jogo";END IF;
+
+
+CALL ExistsGame(p_IDJogo, v_ExisteJogo);
+
+IF v_ExisteJogo = FALSE THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "O jogo inserido não existe";END IF;
+
+SELECT Estado into v_EstadoJogo FROM jogo where IDJogo = p_IDJogo;
+
+IF v_EstadoJogo = 'running' OR v_EstadoJogo =  'finished' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Apenas pode começar jogos no estado pending"; END IF;
+
+SELECT Grupo INTO v_grupo FROM utilizador WHERE Email = v_User;
+
+SELECT COUNT(*) INTO v_ExisteOutroJogoRunning 
+FROM jogo j JOIN utilizador u on u.Email = j.jogador
+WHERE Estado = 'running' AND IDJogo != p_IDJogo AND u.Grupo = v_grupo;  
+
+IF v_ExisteOutroJogoRunning > 0 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Já existe outro jogo em estado running no mesmo grupo";
+END IF;
+
+UPDATE jogo SET Estado = 'running' WHERE IDJogo = p_IDJogo;
+
 END$$
 
 CREATE DEFINER=`root`@`localhost` PROCEDURE `CreateDbUser` (IN `p_username` VARCHAR(100), IN `p_password` VARCHAR(100))   BEGIN
@@ -61,16 +158,45 @@ CREATE DEFINER=`root`@`localhost` PROCEDURE `CreateDbUser` (IN `p_username` VARC
 
 END$$
 
-CREATE DEFINER=`root`@`localhost` PROCEDURE `Criar_jogo` (IN `p_descricao` TEXT)   BEGIN
+CREATE DEFINER=`root`@`localhost` PROCEDURE `Criar_jogo` (IN `p_descricao` TEXT, IN `p_spamTol` INT(11))   BEGIN
 DECLARE v_exists BOOLEAN DEFAULT FALSE;
-    SET @name := SUBSTRING_INDEX(SESSION_USER(), '@localhost', 1);
+DECLARE v_User VARCHAR(100);
+    SET v_User := SUBSTRING_INDEX(SESSION_USER(), '@localhost', 1);
 
+
+	IF v_User IS NULL OR CHAR_LENGTH(TRIM(v_User)) =0 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT="Nenhum utilizador encontrado";END IF;
     IF CHAR_LENGTH(p_descricao) > 999 THEN 
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT= "Descrição demasiado longa";
     END IF;
+	
+    IF p_spamTol IS NULL OR p_spamTol <0 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Valor não pode ser nulo ou menor que 0";END IF;
+    
+    INSERT INTO jogo(descricao, jogador, DataHorainicio, estado,spamTol) 
+    VALUES (p_descricao,v_User, NOW(), 'pending',p_spamTol);
+END$$
 
-    INSERT INTO jogo(descricao, jogador, DataHorainicio, estado) 
-    VALUES (p_descricao, @name, NOW(), 'pending');
+CREATE DEFINER=`root`@`localhost` PROCEDURE `Criar_jogo_JSON` (IN `p_JSONData` JSON)   BEGIN
+
+DECLARE v_User VARCHAR(100);
+DECLARE v_Descricao TEXT;
+DECLARE v_spamTol INT;
+
+SET v_User := SUBSTRING_INDEX(SESSION_USER(), '@localhost', 1);
+
+
+SET v_Descricao = COALESCE(JSON_UNQUOTE(JSON_EXTRACT(p_JSONData,'$.Descricao')),"");
+SET v_spamTol = COALESCE(JSON_UNQUOTE(JSON_EXTRACT(p_JSONData,'$.spamTol')),2);
+
+IF v_User IS NULL OR CHAR_LENGTH(TRIM(v_User)) =0 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT="Nenhum utilizador encontrado";END IF;
+    IF CHAR_LENGTH(v_descricao) > 999 THEN 
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT= "Descrição demasiado longa";
+    END IF;
+	
+    IF v_spamTol <0 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Valor não pode ser nulo ou menor que 0";END IF;
+    
+    INSERT INTO jogo(descricao, jogador, DataHorainicio, estado,spamTol) 
+    VALUES (v_Descricao,v_User, NOW(), 'pending',v_spamTol);
+
 END$$
 
 CREATE DEFINER=`root`@`localhost` PROCEDURE `Criar_utilizador` (IN `p_Nome` VARCHAR(100), IN `p_Telemovel` VARCHAR(12), IN `p_Tipo` VARCHAR(20), IN `p_Grupo` VARCHAR(20), IN `p_Email` VARCHAR(50), IN `p_Password` VARCHAR(100))   BEGIN
@@ -95,46 +221,28 @@ INSERT INTO utilizador (nome, telemovel, tipo, grupo, email)
 VALUES (p_Nome, p_Telemovel, p_Tipo, p_Grupo, p_Email);                                     
 END$$
 
-CREATE DEFINER=`root`@`localhost` PROCEDURE `EditGameAdmin` (IN `p_IDJogo` INT, IN `p_jogador` VARCHAR(50), IN `p_descricao` TEXT, IN `p_estado` VARCHAR(20), IN `p_score` DOUBLE)   BEGIN
-DECLARE v_existsGame BOOLEAN;
-DECLARE v_existsJogador BOOLEAN;
-DECLARE v_isGameCreator BOOLEAN;
-
-IF p_IDJogo IS NULL THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Não foi inserido nenhum jogo";END IF;
-IF p_jogador IS NULL THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Não foi inserido nenhum jogador";END IF;
-
-CALL ExistsGame(p_IDJogo,v_existsGame);
-CALL ExistsUtilizador(p_jogador, v_existsJogador);
-CALL IsGameCreator(p_IDJogo, p_jogador, v_isGameCreator);
-
-
-IF v_existsGame = FALSE THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Jogo Inserido não existe";
-END IF;
-IF v_existsJogador = FALSE THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Jogador Inserido não existe";
-END IF;
-IF v_isGameCreator = FALSE THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Jogador Inserido não é o criador deste jogo existe";
-END IF;
-IF p_estado IS NOT NULL AND p_estado NOT IN ('pending','running','finished') THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Estado inválido ou Nulo";END IF;
-START TRANSACTION;
-
-UPDATE jogo SET Descricao = COALESCE(NULLIF(p_descricao,''),Descricao) ,
-Estado =  COALESCE(NULLIF(p_estado,''),Estado),
-Score =  COALESCE(p_score,Score) WHERE IDJogo = p_IDJogo;
-
-COMMIT;
-
-END$$
-
 CREATE DEFINER=`root`@`localhost` PROCEDURE `Eliminar_Jogo` (IN `p_IDJogo` INT)   BEGIN
 
 DECLARE v_existsGame BOOLEAN;
-
+DECLARE v_EstadoJogo VARCHAR(20);
+DECLARE v_CriadorJogo VARCHAR(100);
+DECLARE v_Tipo VARCHAR(3);
+DECLARE v_User VARCHAR(100);
+SET v_User := SUBSTRING_INDEX(SESSION_USER(), '@localhost', 1);
+SELECT Tipo INTO v_Tipo FROM utilizador WHERE Email = v_User;
+SELECT Jogador INTO v_CriadorJogo FROM jogo WHERE IDJogo = p_IDJogo;
 IF (p_IDJogo IS NULL) THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Não foi inserido nenhum ID de Jogo";END IF;
 
 
 CALL ExistsGame(p_IDJogo,v_existsGame);
  
 IF(v_existsGame = FALSE) THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Não existe nenhum jogo com esse ID";END IF;
+
+IF v_CriadorJogo <> v_User AND v_Tipo <> 'ADM' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "O jogador não tem permissoões para alterar este jogo";END IF;
+    
+    SELECT Estado into v_EstadoJogo FROM jogo where IDJogo = p_IDJogo;
+
+IF v_EstadoJogo = 'running' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Não pode eliminar jogos que estão a decorrer"; END IF;
 
 DELETE FROM jogo WHERE IDJogo=p_IDJogo;
 END$$
@@ -161,89 +269,10 @@ WHERE utilizador.Email = p_Email;
 
 END$$
 
-CREATE DEFINER=`root`@`localhost` PROCEDURE `FinishGame` (IN `p_IDJogo` INT)   BEGIN 
-
-DECLARE v_existsGame BOOLEAN DEFAULT FALSE;
-DECLARE v_isGameRunning BOOLEAN DEFAULT FALSE;
-DECLARE v_isGameFinished BOOLEAN DEFAULT FALSE;
-
-IF p_IDJogo IS NULL THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Não foi inserido nenhum jogo";END IF;
-
-CALL ExistsGame(p_IDJogo,v_existsGame);
-CALL IsGameRunning(p_IDJogo,v_isGameRunning);
-CALL IsGameFinished(p_IDJogo, v_isGameFinished);
-IF v_existsGame = FALSE THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "O jogo inserido não existe";END IF;
-IF v_isGameFinished = TRUE THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Este jogo já foi finalizado";END IF;
-IF v_isGameRunning = FALSE THEN SIGNAL SQLSTATE '45000' set MESSAGE_TEXT = "O jogo precisa de estar a correr para poder ser finalizado";END IF;
-
-UPDATE jogo SET Estado = 'finished' WHERE IDJogo= p_IDJogo; 
-
-END$$
-
 CREATE DEFINER=`root`@`localhost` PROCEDURE `GetGames` (IN `p_grupo` INT)   BEGIN
 
 SELECT * FROM jogo j INNER JOIN utilizador u ON j.jogador = u.Email WHERE u.Grupo = p_grupo;
 
-END$$
-
-CREATE DEFINER=`root`@`localhost` PROCEDURE `IsGameCreator` (IN `p_IDJogo` INT, IN `p_jogador` VARCHAR(50), OUT `p_creator` BOOLEAN)   BEGIN
-
-DECLARE count INT;
-
-DECLARE v_existsGame BOOLEAN;
-DECLARE v_existsJogador BOOLEAN;
-IF p_IDJogo IS NULL THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Não foi inserido nenhum jogo";
-END IF;
-
-IF p_jogador IS NULL THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Não foi inserido nenhum utilizador para fazer a verificação";
-END IF;
-
-CALL ExistsGame(p_IDJogo,v_existsGame);
-CALL ExistsUtilizador(p_jogador,v_existsJogador);
-
-IF v_existsGame= FALSE THEN 
-SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Não foi encontrado nenhum jogo com esse ID";
-END IF;
-
-IF v_existsJogador= FALSE THEN 
-SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Não foi encontrado nenhum utilizador com esse Email";
-END IF;
-SELECT COUNT(*) INTO count FROM jogo WHERE jogo.IDJogo = p_IDJogo AND jogo.jogador = p_jogador;
- 
-SET p_creator = (count > 0);
-
-END$$
-
-CREATE DEFINER=`root`@`localhost` PROCEDURE `IsGameFinished` (IN `p_IDJogo` INT, OUT `p_finished` BOOLEAN)   BEGIN
-
-DECLARE v_existsGame BOOLEAN DEFAULT FALSE;
-DECLARE v_count INT;
-
-IF p_IDJogo IS NULL THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Não foi inserido nenhum jogo";END IF;
-
-CALL ExistsGame(p_IDJogo,v_existsGame);
-
-IF v_existsGame = FALSE THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT ="O jogo inserido não existe";END IF;
-
-SELECT COUNT(*) INTO v_count FROM jogo WHERE IDJogo = p_IDJogo AND Estado = 'finished';
-
-SET p_finished = (v_count > 0);
-END$$
-
-CREATE DEFINER=`root`@`localhost` PROCEDURE `IsGameRunning` (IN `p_IDJogo` INT, OUT `p_running` INT)   BEGIN
-
-DECLARE v_existsGame BOOLEAN DEFAULT FALSE;
-DECLARE v_count INT;
-
-IF p_IDJogo IS NULL THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Não foi inserido nenhum jogo";END IF;
-
-CALL ExistsGame(p_IDJogo,v_existsGame);
-
-IF v_existsGame = FALSE THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT ="O jogo inserido não existe";END IF;
-
-SELECT COUNT(*) INTO v_count FROM jogo WHERE IDJogo = p_IDJogo AND Estado = 'running';
-
-SET p_running = (v_count > 0);
 END$$
 
 CREATE DEFINER=`root`@`localhost` PROCEDURE `Remover_utilizador` (IN `p_utilizador` VARCHAR(50))   BEGIN
@@ -255,51 +284,11 @@ CALL ExistsUtilizador(p_utilizador,v_existsUtilizador);
 
 IF (v_existsUtilizador = FALSE) THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Utilizador não existe";END IF;
 
-DELETE FROM utilizador WHERE  Email= p_utilizador;
-END$$
-
-CREATE DEFINER=`root`@`localhost` PROCEDURE `StartRunGame` (IN `p_IDJogo` INT, IN `p_jogador` VARCHAR(50))   BEGIN
-
-DECLARE v_alreadyRunningGame BOOLEAN DEFAULT FALSE;
-DECLARE v_existsUser BOOLEAN DEFAULT FALSE;
-DECLARE v_isGameCreator BOOLEAN DEFAULT FALSE;
-DECLARE v_existsGame BOOLEAN DEFAULT FALSE;
-DECLARE v_gameRunning BOOLEAN DEFAULT FALSE;
-DECLARE v_gameFinished BOOLEAN DEFAULT FALSE;
-IF p_IDJogo IS NULL THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Nenhum jogo foi inserido";END IF;
-IF p_jogador IS NULL OR CHAR_LENGTH(TRIM(p_jogador)) = 0 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Nenhum email de utilizador foi inserido";END IF;
-
-CALL ExistsUtilizador(p_jogador,v_existsUser);
-CALL ExistsGame(p_IDJogo,v_existsGame);
-CALL IsGameCreator(p_IDJogo,p_jogador,v_IsGameCreator);
-CALL IsGameFinished(p_IDJogo,v_gameFinished);
-CALL IsGameRunning(p_IDJogo,v_gameRunning);
-
-IF v_existsUser = FALSE THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Utilizador inserido não existe";END IF;
-IF v_existsGame = FALSE THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Jogo inserido não existe";END IF;
-IF v_IsGameCreator = FALSE THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Este utilizador não é o criador do jogo";END IF;
-IF v_gameFinished = TRUE THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Este jogo já foi finalizado";END IF;
-IF v_gameRunning = TRUE THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Este jogo já está a decorrer";END IF;
-
-
-UPDATE jogo SET Estado = 'running' WHERE IDJogo = p_IDJogo AND jogador = p_jogador;
-
-
-END$$
-
-CREATE DEFINER=`root`@`localhost` PROCEDURE `UtilizadorActiveGame` (IN `p_jogador` VARCHAR(50), OUT `p_hasActiveGame` BOOLEAN)   BEGIN
-
-DECLARE v_existsUtilizador BOOLEAN DEFAULT FALSE;
-DECLARE v_GamesCount INT DEFAULT 0;
-IF p_jogador IS NULL THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Não foi introduzido nenhum utilizador";END IF;
-
-CALL ExistsUtilizador(p_jogador, v_ExistsUtilizador);
-
-IF v_ExistsUtilizador = FALSE THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "Utilizador inserido não existe";END IF;
-
-SELECT COUNT(*) INTO v_GamesCount FROM jogo WHERE jogador = p_jogador AND Estado = 'running';
-
-SET p_hasActiveGame = (v_GamesCount > 0);
+DELETE FROM utilizador WHERE  Email=p_utilizador;
+SET @drop_sql := CONCAT('DROP USER \'', p_utilizador, '\'@\'localhost\'');
+PREPARE stmt FROM @drop_sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 END$$
 
 CREATE DEFINER=`root`@`localhost` PROCEDURE `ValidEmail` (IN `p_Email` VARCHAR(50), OUT `p_isValid` BOOLEAN)   BEGIN 
@@ -394,9 +383,11 @@ CREATE TABLE `jogo` (
 --
 
 INSERT INTO `jogo` (`IDJogo`, `Descricao`, `jogador`, `DataHorainicio`, `Estado`, `Score`, `spamTol`) VALUES
-(1, 'New game description', 'johndoe@example.com', '2025-05-05 13:41:22', 'running', 100, 3),
-(3, 'testeHGKJHGKJHG', 'player1@example.com', '2025-05-08 00:06:24', 'pending', -1, 0),
-(6, 'adasdasdadasdsadasdasfffffffffffffff', 'rafaelnicolau@gmail.com', '2025-05-08 00:06:18', 'pending', -1, 0);
+(1, '\"Jogo fixe 1\"', 'joao@gmail.com', '2025-05-12 18:05:45', 'finished', 1, 3),
+(3, '\"Jogo fixe 2\"', 'joao@gmail.com', '2025-05-10 17:38:43', 'pending', -1, 3),
+(6, '\"Jogo fixe 3\"', 'joao@gmail.com', '2025-05-10 17:39:03', 'pending', -1, 3),
+(9, '\"Jogo fixe 5\"', 'joao@gmail.com', '2025-05-10 17:39:18', 'pending', -1, 3),
+(10, 'testestestes', 'andre@gmail.com', '2025-05-12 19:40:18', 'finished', 9.5, 5);
 
 -- --------------------------------------------------------
 
@@ -522,24 +513,8 @@ CREATE TABLE `ocupacaolabirinto` (
   `NumeroMarsamisOdd` int(11) NOT NULL,
   `NumeroMarsamisEven` int(11) NOT NULL,
   `Sala` int(11) NOT NULL,
-  `Tentativas` int(11) NOT NULL DEFAULT 0
+  `tentativas` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Extraindo dados da tabela `ocupacaolabirinto`
---
-
-INSERT INTO `ocupacaolabirinto` (`IDJogo`, `NumeroMarsamisOdd`, `NumeroMarsamisEven`, `Sala`, `Tentativas`) VALUES
-(1, 0, 0, 1, 0),
-(1, 0, 0, 2, 0),
-(1, 0, 0, 3, 0),
-(1, 0, 0, 4, 0),
-(1, 0, 0, 5, 0),
-(1, 0, 0, 6, 0),
-(1, 0, 0, 7, 0),
-(1, 0, 0, 8, 0),
-(1, 0, 0, 9, 0),
-(1, 0, 0, 10, 0);
 
 -- --------------------------------------------------------
 
@@ -563,7 +538,7 @@ CREATE TABLE `setupmaze` (
 
 INSERT INTO `setupmaze` (`normalnoise`, `numberrooms`, `numbermarsamis`, `numberplayers`, `noisevartoleration`, `ID`, `last_updated`) VALUES
 (19.00, 10, 30, 40, 2.50, 0, '0000-00-00 00:00:00'),
-(19.00, 10, 30, 40, 2.50, 1, '2025-05-05 15:12:01');
+(19.20, 10, 30, 40, 2.00, 1, '2025-05-12 19:43:54');
 
 --
 -- Acionadores `setupmaze`
@@ -665,7 +640,7 @@ CREATE TABLE `sound` (
 CREATE TABLE `utilizador` (
   `Nome` varchar(100) NOT NULL,
   `Telemovel` varchar(12) NOT NULL,
-  `Tipo` varchar(3) NOT NULL,
+  `Tipo` enum('USER','ADMIN','SCRIPT') NOT NULL,
   `Grupo` int(11) NOT NULL,
   `Email` varchar(50) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -675,10 +650,8 @@ CREATE TABLE `utilizador` (
 --
 
 INSERT INTO `utilizador` (`Nome`, `Telemovel`, `Tipo`, `Grupo`, `Email`) VALUES
-('ff', '22', '22', 22, '22'),
-('John Doe', '912345678', 'Pla', 0, 'johndoe@example.com'),
-('player1', '123456789', '11', 15, 'player1@example.com'),
-('Rafael', '123414', 'Adm', 15, 'rafaelnicolau@gmail.com');
+('Andre', '910110110', 'USER', 15, 'andre@gmail.com'),
+('Joao', '910110110', 'USER', 15, 'joao@gmail.com');
 
 --
 -- Índices para tabelas despejadas
@@ -757,7 +730,7 @@ ALTER TABLE `corridor`
 -- AUTO_INCREMENT de tabela `jogo`
 --
 ALTER TABLE `jogo`
-  MODIFY `IDJogo` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+  MODIFY `IDJogo` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
 
 --
 -- AUTO_INCREMENT de tabela `mensagens`

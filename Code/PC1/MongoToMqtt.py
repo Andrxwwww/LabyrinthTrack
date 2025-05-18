@@ -123,7 +123,7 @@ def publish_data(collection, mqtt_topic):
 
             if mqtt_topic == GROUP_MQTT_MOVE_TOPIC:
                 if documento.get("IDMove") == 0 or documento.get("IDSound") == 2:
-                    if validar_movimento(documento):
+                    if validar_movimento(documento) and verifyMovimentoValido(documento.get("RoomOrigin"), documento.get("RoomDestiny")):
                         mensagem_json = json.dumps(mensagem, default=str)
                         print(f"[MongoDB->MQTT] Publicado Move (VALIDADO): {mensagem_json}")
                         client.publish(mqtt_topic, mensagem_json)

@@ -72,8 +72,8 @@ def validar_mensagem_move(doc):
 
     # TODO: DEPOIS TIRAR PARA DADOS MAIS RECENTES
     # Validação 7: Verificar se a data está dentro do intervalo
-    # if not validar_data(Hora):
-    #   return False
+    if not validar_data(Hora):
+       return False
 
     return False
 
@@ -445,8 +445,8 @@ def reconnect_db():
         try:
             db = mariadb.connect(
                 host="127.0.0.1",
-                user="script2",
-                password="12345",
+                user="root",
+                password="",
                 database="pisid_sql"
             )
             cursor = db.cursor()
